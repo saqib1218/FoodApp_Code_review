@@ -1,10 +1,12 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, Link } from 'react-router-dom';
-import { ArrowLeftIcon, EnvelopeIcon, PhoneIcon, XMarkIcon } from '@heroicons/react/24/outline';
+import { ArrowLeftIcon, EnvelopeIcon, PhoneIcon, XMarkIcon, EyeIcon } from '@heroicons/react/24/outline';
 import { useGetPartnerByIdQuery, useApprovePartnerMutation, useSuspendPartnerMutation } from '../../store/api/modules/partners/partnersApi';
+import { useCreateKitchenMutation, useGetKitchenByPartnerIdQuery } from '../../store/api/modules/kitchens/kitchensApi';
 import { usePermissions } from '../../hooks/usePermissions';
 import { PERMISSIONS } from '../../contexts/PermissionRegistry';
 import ConfirmationModal from '../../components/ConfirmationModal';
+import DialogueBox from '../../components/DialogueBox';
 
 const PartenerDetail = () => {
   const { id } = useParams();
@@ -38,12 +40,31 @@ const PartenerDetail = () => {
   const [approvePartner, { isLoading: isApproving }] = useApprovePartnerMutation();
   const [suspendPartner, { isLoading: isSuspending }] = useSuspendPartnerMutation();
   
+  // RTK Query mutation for kitchen creation
+  const [createKitchen, { isLoading: isCreatingKitchen }] = useCreateKitchenMutation();
+  
+  // RTK Query to fetch kitchen by partner ID
+  const { data: kitchenResponse, isLoading: isLoadingKitchen, error: kitchenError } = useGetKitchenByPartnerIdQuery(id, {
+    skip: !id
+  });
+  
+  // Extract kitchen data from API response
+  const kitchenData = kitchenResponse?.data;
+  
   const [activeTab, setActiveTab] = useState('info');
   
   // Kitchen creation modal state
   const [showKitchenModal, setShowKitchenModal] = useState(false);
   const [showConfirmationModal, setShowConfirmationModal] = useState(false);
   const [confirmationComment, setConfirmationComment] = useState('');
+  
+  // Dialogue box state for API feedback
+  const [dialogueBox, setDialogueBox] = useState({
+    isOpen: false,
+    type: 'success', // 'success' or 'error'
+    title: '',
+    message: ''
+  });
   
   // Rejection modal state
   const [showRejectModal, setShowRejectModal] = useState(false);
@@ -52,6 +73,7 @@ const PartenerDetail = () => {
   const [kitchenForm, setKitchenForm] = useState({
     name: '',
     tagline: '',
+    bio: '',
     approvalStatus: 'Pending for approval'
   });
   const [kitchenNameError, setKitchenNameError] = useState('');
@@ -109,12 +131,48 @@ const PartenerDetail = () => {
     setShowKitchenModal(true);
   };
 
-  const handleCreateKitchen = () => {
+  const handleCreateKitchen = async () => {
     const nameError = validateKitchenName(kitchenForm.name);
     setKitchenNameError(nameError);
     
     if (kitchenForm.name.trim() && !nameError) {
-      setShowConfirmationModal(true);
+      try {
+        const kitchenData = {
+          name: kitchenForm.name,
+          tagline: kitchenForm.tagline,
+          bio: kitchenForm.bio,
+          ownerId: id // Partner ID from URL params
+        };
+        
+        const result = await createKitchen(kitchenData).unwrap();
+        console.log('Kitchen created successfully:', result);
+        
+        // Close modal and reset form
+        setShowKitchenModal(false);
+        setKitchenForm({ name: '', tagline: '', bio: '', approvalStatus: 'Pending for approval' });
+        setKitchenNameError('');
+        
+        // Show success message
+        showDialogue('success', 'Success', 'Kitchen created successfully!');
+      } catch (error) {
+        console.error('Failed to create kitchen:', error);
+        
+        // Handle different error types
+        let errorMessage = 'Failed to create kitchen. Please try again.';
+        
+        if (error?.data) {
+          // Handle API error response structure
+          if (error.data.code === 'KITCHEN.ALREADY_EXISTS') {
+            errorMessage = error.data.message || 'A kitchen is already associated with this user.';
+          } else if (error.data.message) {
+            errorMessage = error.data.message;
+          }
+        } else if (error?.message) {
+          errorMessage = error.message;
+        }
+        
+        showDialogue('error', 'Error', errorMessage);
+      }
     }
   };
 
@@ -140,8 +198,22 @@ const PartenerDetail = () => {
 
   const handleCancelKitchen = () => {
     setShowKitchenModal(false);
-    setKitchenForm({ name: '', tagline: '', approvalStatus: 'Pending for approval' });
+    setKitchenForm({ name: '', tagline: '', bio: '', approvalStatus: 'Pending for approval' });
     setKitchenNameError('');
+  };
+  
+  // Helper functions for dialogue box
+  const showDialogue = (type, title, message) => {
+    setDialogueBox({
+      isOpen: true,
+      type,
+      title,
+      message
+    });
+  };
+  
+  const closeDialogue = () => {
+    setDialogueBox(prev => ({ ...prev, isOpen: false }));
   };
 
   // Handle ID verification edit
@@ -464,7 +536,7 @@ const PartenerDetail = () => {
           <div className="p-6">
             <div className="flex justify-between items-center mb-6">
               <h2 className="text-lg font-medium text-gray-900">Kitchen Information</h2>
-              {!partener.kitchen && (
+              {!kitchenData && hasPermission(PERMISSIONS.KITCHEN_CREATE) && (
                 <button
                   onClick={handleOpenKitchenModal}
                   className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-primary-600 hover:bg-primary-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500"
@@ -474,22 +546,67 @@ const PartenerDetail = () => {
               )}
             </div>
             
-            {partener.kitchen ? (
-              <div className=" p-6 rounded-lg">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                  <div>
-                    <h3 className="text-sm font-medium text-gray-500 mb-2">Kitchen Name</h3>
-                    <p className="text-lg font-semibold text-gray-900">{partener.kitchen.name}</p>
-                  </div>
-                  <div>
-                    <h3 className="text-sm font-medium text-gray-500 mb-2">Kitchen Tagline</h3>
-                    <p className="text-gray-900">{partener.kitchen.tagline || 'No tagline'}</p>
-                  </div>
-                  <div>
-                    <h3 className="text-sm font-medium text-gray-500 mb-2">Created Date</h3>
-                    <p className="text-gray-900">{partener.kitchen.createdAt ? new Date(partener.kitchen.createdAt).toLocaleDateString() : 'N/A'}</p>
-                  </div>
+            {isLoadingKitchen ? (
+              <div className="text-center py-12">
+                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary-600 mx-auto mb-4"></div>
+                <p className="text-gray-500">Loading kitchen information...</p>
+              </div>
+            ) : kitchenError && kitchenError.status !== 404 ? (
+              <div className="text-center py-12">
+                <div className="text-red-500">
+                  <p className="text-lg font-medium">Error Loading Kitchen</p>
+                  <p className="mt-2">Failed to load kitchen information. Please try again later.</p>
                 </div>
+              </div>
+            ) : kitchenData ? (
+              <div className="overflow-hidden shadow ring-1 ring-black ring-opacity-5 md:rounded-lg">
+                <table className="min-w-full divide-y divide-gray-300">
+                  <thead className="bg-gray-50">
+                    <tr>
+                      <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wide">
+                        Kitchen Name
+                      </th>
+                      <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wide">
+                        Tagline
+                      </th>
+                      <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wide">
+                        Status
+                      </th>
+                      <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wide">
+                        Actions
+                      </th>
+                    </tr>
+                  </thead>
+                  <tbody className="bg-white divide-y divide-gray-200">
+                    <tr>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
+                        {kitchenData.kitchenName}
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                        {kitchenData.tagline || 'No tagline'}
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
+                          kitchenData.status === 'ACTIVE' 
+                            ? 'bg-green-100 text-green-800'
+                            : kitchenData.status === 'DRAFT'
+                            ? 'bg-yellow-100 text-yellow-800'
+                            : 'bg-gray-100 text-gray-800'
+                        }`}>
+                          {kitchenData.status}
+                        </span>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
+                        <Link
+                          to={`/kitchens/${kitchenData.kitchenId}`}
+                          className="text-primary-600 hover:text-primary-900 inline-flex items-center"
+                        >
+                          <EyeIcon className="h-4 w-4" />
+                        </Link>
+                      </td>
+                    </tr>
+                  </tbody>
+                </table>
               </div>
             ) : (
               <div className="text-center py-12">
@@ -796,6 +913,20 @@ const PartenerDetail = () => {
               </div>
               
               <div>
+                <label htmlFor="kitchenBio" className="block text-sm font-medium text-gray-700 mb-1">
+                  Kitchen Bio
+                </label>
+                <textarea
+                  id="kitchenBio"
+                  value={kitchenForm.bio}
+                  onChange={(e) => setKitchenForm({ ...kitchenForm, bio: e.target.value })}
+                  rows={3}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
+                  placeholder="Enter kitchen bio (optional)"
+                />
+              </div>
+              
+              <div>
                 <label htmlFor="approvalStatus" className="block text-sm font-medium text-gray-700 mb-1">
                   Approval Status
                 </label>
@@ -819,10 +950,10 @@ const PartenerDetail = () => {
               </button>
               <button
                 onClick={handleCreateKitchen}
-                disabled={!kitchenForm.name.trim() || kitchenNameError}
+                disabled={!kitchenForm.name.trim() || kitchenNameError || isCreatingKitchen}
                 className="px-4 py-2 bg-primary-600 text-white rounded-full hover:bg-primary-700 disabled:bg-primary-300 disabled:cursor-not-allowed transition-colors text-sm font-medium"
               >
-                Create Kitchen
+                {isCreatingKitchen ? 'Creating...' : 'Create Kitchen'}
               </button>
             </div>
           </div>
@@ -898,15 +1029,25 @@ const PartenerDetail = () => {
       {/* Confirmation Modal */}
       <ConfirmationModal
         isOpen={showConfirmationModal}
-        title="Confirm Kitchen Creation"
-        message={`Are you sure you want to create this kitchen with the following details?\n\nKitchen Name: ${kitchenForm.name}${kitchenForm.tagline ? `\nTagline: ${kitchenForm.tagline}` : ''}\nStatus: ${kitchenForm.approvalStatus}`}
-        comment={confirmationComment}
-        onCommentChange={setConfirmationComment}
+        title="Create Kitchen"
+        message={`Are you sure you want to create kitchen "${kitchenForm.name}"?`}
+        confirmText="Create"
+        cancelText="Cancel"
         onConfirm={handleConfirmCreateKitchen}
         onCancel={handleCancelConfirmation}
-        confirmButtonText="Create Kitchen"
-        confirmButtonColor="primary"
-        isCommentRequired={true}
+        comment={confirmationComment}
+        onCommentChange={setConfirmationComment}
+      />
+      
+      {/* DialogueBox for API Success/Error Messages */}
+      <DialogueBox
+        isOpen={dialogueBox.isOpen}
+        onClose={closeDialogue}
+        type={dialogueBox.type}
+        title={dialogueBox.title}
+        message={dialogueBox.message}
+        autoClose={true}
+        autoCloseDelay={3000}
       />
 
       {/* Rejection Modal */}

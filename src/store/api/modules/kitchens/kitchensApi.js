@@ -31,9 +31,14 @@ export const kitchensApi = apiSlice.injectEndpoints({
       providesTags: (result, error, arg) => [{ type: 'Kitchen', id: arg }],
     }),
     
+    getKitchenByPartnerId: builder.query({
+      query: (partnerId) => `/admin/partners/${partnerId}/kitchen`,
+      providesTags: (result, error, arg) => [{ type: 'Kitchen', id: `partner-${arg}` }],
+    }),
+    
     createKitchen: builder.mutation({
       query: (kitchenData) => ({
-        url: '/admin/kitchens',
+        url: '/admin/kitchens/create',
         method: 'POST',
         body: kitchenData,
       }),
@@ -245,7 +250,7 @@ export const kitchensApi = apiSlice.injectEndpoints({
     
     addKitchenAddress: builder.mutation({
       query: ({ kitchenId, addressData }) => ({
-        url: `/admin/kitchens/${kitchenId}/addresses`,
+        url: `/admin/kitchens/${kitchenId}/address`,
         method: 'POST',
         body: addressData,
       }),
@@ -257,8 +262,8 @@ export const kitchensApi = apiSlice.injectEndpoints({
     
     updateKitchenAddress: builder.mutation({
       query: ({ kitchenId, addressId, addressData }) => ({
-        url: `/admin/kitchens/${kitchenId}/addresses/${addressId}`,
-        method: 'PUT',
+        url: `/admin/kitchens/${kitchenId}/address/${addressId}`,
+        method: 'PATCH',
         body: addressData,
       }),
       invalidatesTags: (result, error, arg) => [
@@ -330,6 +335,7 @@ export const {
   // Kitchen Management
   useGetKitchensQuery,
   useGetKitchenByIdQuery,
+  useGetKitchenByPartnerIdQuery,
   useCreateKitchenMutation,
   useUpdateKitchenMutation,
   useDeleteKitchenMutation,

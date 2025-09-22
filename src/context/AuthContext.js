@@ -98,12 +98,12 @@ const TokenStorage = {
     return Date.now() >= (tokenExpiry.expiryTime - 300000);
   },
   
+  // Clear all stored data
   clearAll: () => {
-    delete axios.defaults.headers.common['Authorization'];
     sessionStorage.removeItem('access_token');
     sessionStorage.removeItem('user_info');
     sessionStorage.removeItem('token_expiry');
-    localStorage.removeItem('auth_token'); // Remove old token if exists
+    delete axios.defaults.headers.common['Authorization'];
   }
 };
 
@@ -184,7 +184,7 @@ export const AuthProvider = ({ children }) => {
       };
       TokenStorage.setUserInfo(userInfo);
       
-      // Fetch user permissions immediately after successful login
+      // CRITICAL FIX: Fetch user permissions and WAIT for completion before setting auth state
       console.log('Login successful, fetching user permissions...');
       try {
         const permissionsResponse = await axios.get(`${apiBaseUrl}/admin/users/${decodedToken.userId}/permissions`);
@@ -201,34 +201,41 @@ export const AuthProvider = ({ children }) => {
           
           console.log('Permissions loaded successfully:', permissionKeys);
           
-          // Update state with fetched permissions
+          // ONLY set authentication state AFTER permissions are successfully loaded
           setCurrentUser(userInfo);
           setIsAuthenticated(true);
           setUserRole(decodedToken.role);
           setUserPermissions(permissionKeys); // Use fetched permission keys
           
+          // Set up automatic token refresh (if you implement refresh later)
+          if (expiresIn > 0) {
+            scheduleTokenRefresh(expiresIn);
+          }
+          
           return { success: true, userInfo };
+        } else {
+          // If permissions API returns empty or invalid data, throw error
+          throw new Error('Permissions API returned invalid data');
         }
       } catch (permissionError) {
         console.error('Failed to fetch permissions during login:', permissionError);
-        // Continue with login even if permissions fail - they can be loaded later
+        
+        // CRITICAL: Don't allow login to complete if permissions fail
+        // Clear stored tokens since login is incomplete
+        TokenStorage.clearAll();
+        
+        return { 
+          success: false, 
+          message: 'Failed to load user permissions. Please try again.' 
+        };
       }
-      
-      // Update state after permissions are loaded (or attempted) - fallback if permissions fetch failed
-      setCurrentUser(userInfo);
-      setIsAuthenticated(true);
-      setUserRole(decodedToken.role);
-      setUserPermissions(decodedToken.permissions || []);
-      
-      // Set up automatic token refresh (if you implement refresh later)
-      if (expiresIn > 0) {
-        scheduleTokenRefresh(expiresIn);
-      }
-      
-      return { success: true, userInfo };
       
     } catch (error) {
       console.error('Login failed:', error);
+      
+      // Clear any stored tokens on login failure
+      TokenStorage.clearAll();
+      
       return { 
         success: false, 
         message: error.response?.data?.message || 'Login failed' 

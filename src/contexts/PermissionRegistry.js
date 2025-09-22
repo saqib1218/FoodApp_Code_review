@@ -36,6 +36,10 @@ export const PERMISSIONS = {
   KITCHEN_ADDRESS_LIST_VIEW: 'admin.kitchen.address.list.view',
   KITCHEN_AVAILABILITY_VIEW: 'admin.kitchen.availability.view',
   KITCHEN_EDIT: 'admin.kitchen.edit',
+  KITCHEN_CREATE: 'admin.kitchen.create',
+  KITCHEN_ADDRESS_ADD: 'admin.kitchen.address.add',
+  KITCHEN_ADDRESS_EDIT: 'admin.kitchen.address.edit',
+  KITCHEN_AVAILABILITY_ADD: 'admin.kitchen.availability.add',
 
   // Partner Management
   PARTNER_VIEW: 'admin.partner.view',

@@ -1,10 +1,11 @@
 import React, { useState, useContext } from 'react';
 import { PencilIcon, XMarkIcon, PlusIcon, EyeIcon, TrashIcon } from '@heroicons/react/24/outline';
-import { useGetKitchenAddressesQuery } from '../../../store/api/modules/kitchens/kitchensApi';
+import { useGetKitchenAddressesQuery, useAddKitchenAddressMutation, useUpdateKitchenAddressMutation } from '../../../store/api/modules/kitchens/kitchensApi';
 import { useAuth } from '../../../hooks/useAuth';
 import { PERMISSIONS } from '../../../contexts/PermissionRegistry';
 import { KitchenContext } from './index';
 import ConfirmationModal from '../../../components/ConfirmationModal';
+import DialogueBox from '../../../components/DialogueBox';
 
 const KitchenAddressesTab = () => {
   const { hasPermission } = useAuth();
@@ -18,6 +19,12 @@ const KitchenAddressesTab = () => {
   const { data: addressesResponse, isLoading: isLoadingAddresses, error } = useGetKitchenAddressesQuery(kitchenId, {
     skip: !canViewKitchenAddresses || !kitchenId
   });
+  
+  // RTK Query mutation for adding kitchen address
+  const [addKitchenAddress, { isLoading: isAddingAddress }] = useAddKitchenAddressMutation();
+  
+  // RTK Query mutation for updating kitchen address
+  const [updateKitchenAddress, { isLoading: isUpdatingAddress }] = useUpdateKitchenAddressMutation();
   
   // Extract addresses data from API response
   const addresses = addressesResponse?.data || [];
@@ -36,6 +43,15 @@ const KitchenAddressesTab = () => {
   const [showUpdateConfirmModal, setShowUpdateConfirmModal] = useState(false);
   const [deleteComment, setDeleteComment] = useState('');
   const [updateComment, setUpdateComment] = useState('');
+  
+  // Dialogue box state for API feedback
+  const [dialogueBox, setDialogueBox] = useState({
+    isOpen: false,
+    type: 'success', // 'success' or 'error'
+    title: '',
+    message: ''
+  });
+  
   const [addressForm, setAddressForm] = useState({
     street: '',
     city: '',
@@ -45,7 +61,24 @@ const KitchenAddressesTab = () => {
     type: 'primary'
   });
 
-  // Remove the old state and useEffect - now using RTK Query
+  // Dialogue box helper functions
+  const showDialogue = (type, title, message) => {
+    setDialogueBox({
+      isOpen: true,
+      type,
+      title,
+      message
+    });
+  };
+
+  const closeDialogue = () => {
+    setDialogueBox({
+      isOpen: false,
+      type: 'success',
+      title: '',
+      message: ''
+    });
+  };
 
   // Handle add address
   const handleAddAddress = () => {
@@ -68,11 +101,15 @@ const KitchenAddressesTab = () => {
   const handleEditAddress = (address) => {
     setSelectedAddress(address);
     setAddressForm({
-      fullAddress: address.fullAddress || '',
+      fullAddress: address.addressLine1 || '',
       city: address.city || '',
-      cityZone: address.cityZone || '',
+      cityZone: address.zone || '',
       nearestLocation: address.nearestLocation || '',
-      type: address.type || 'primary'
+      locationLink: address.mapLink || '',
+      longitude: address.longitude || '',
+      latitude: address.latitude || '',
+      country: address.country || '',
+      status: address.status || 'active'
     });
     setShowAddressModal(true);
   };
@@ -103,23 +140,52 @@ const KitchenAddressesTab = () => {
   };
 
   // Handle update confirmation for address updates
-  const handleConfirmUpdateAddress = () => {
+  const handleConfirmUpdateAddress = async () => {
     if (!selectedAddress) return;
 
-    // TODO: Implement API call to update address
-    console.log('Update address:', { addressId: selectedAddress.id, addressData: addressForm, comment: updateComment });
-    
-    setShowUpdateConfirmModal(false);
-    setShowAddressModal(false);
-    setSelectedAddress(null);
-    setUpdateComment('');
-    setAddressForm({
-      fullAddress: '',
-      city: '',
-      cityZone: '',
-      nearestLocation: '',
-      type: 'primary'
-    });
+    try {
+      // Prepare API payload with only required fields for update
+      const apiPayload = {
+        addressLine1: addressForm.fullAddress,
+        city: addressForm.city,
+        country: addressForm.country
+      };
+      
+      // Call API to update address
+      const result = await updateKitchenAddress({
+        kitchenId,
+        addressId: selectedAddress.kitchenAddressId || selectedAddress.id,
+        addressData: apiPayload
+      }).unwrap();
+      
+      console.log('Address updated successfully:', result);
+      
+      // Show success dialogue
+      showDialogue('success', 'Address Updated', 'Kitchen address has been updated successfully.');
+      
+      // Reset form and close modals
+      setShowUpdateConfirmModal(false);
+      setShowAddressModal(false);
+      setSelectedAddress(null);
+      setUpdateComment('');
+      setAddressForm({
+        fullAddress: '',
+        city: '',
+        cityZone: '',
+        nearestLocation: '',
+        locationLink: '',
+        longitude: '',
+        latitude: '',
+        country: '',
+        status: 'active'
+      });
+    } catch (err) {
+      console.error('Failed to update address:', err);
+      
+      // Show error dialogue
+      const errorMessage = err?.data?.message || 'Failed to update address. Please try again.';
+      showDialogue('error', 'Error', errorMessage);
+    }
   };
 
   // Handle get location
@@ -160,40 +226,61 @@ const KitchenAddressesTab = () => {
   };
 
   // Confirm address action
-  const confirmAddressAction = () => {
+  const confirmAddressAction = async () => {
     try {
       if (modalAction === 'add') {
-        // Add new address to local state (mock implementation)
-        const newAddress = {
-          id: `addr-${Date.now()}`,
-          kitchenId: kitchenId.toString(),
-          fullAddress: addressForm.fullAddress,
-          cityZone: addressForm.cityZone,
-          googleMapLink: addressForm.googleMapLink,
-          nearestLocation: addressForm.nearestLocation,
-          deliveryInstructions: addressForm.deliveryInstructions,
-          createdAt: new Date().toISOString(),
-          updatedAt: new Date().toISOString()
+        // Prepare API payload with only required fields
+        const apiPayload = {
+          addressLine1: addressForm.fullAddress,
+          city: addressForm.city,
+          country: addressForm.country
         };
-        // TODO: Implement API call to add address
-        console.log('Add address:', { kitchenId, addressData: addressForm, comment: confirmComment });
+        
+        // Call API to add address
+        const result = await addKitchenAddress({
+          kitchenId,
+          addressData: apiPayload
+        }).unwrap();
+        
+        console.log('Address added successfully:', result);
+        
+        // Show success dialogue
+        showDialogue('success', 'Address Added', 'Kitchen address has been added successfully.');
+        
+        // Reset form after successful addition
+        setAddressForm({
+          fullAddress: '',
+          city: '',
+          cityZone: '',
+          nearestLocation: '',
+          locationLink: '',
+          longitude: '',
+          latitude: '',
+          country: '',
+          status: 'active'
+        });
       } else {
-        // Update existing address in local state (mock implementation)
-        const updatedAddresses = addresses.map(addr => 
-          addr.id === selectedAddress.id 
-            ? { 
-                ...addr, 
-                fullAddress: addressForm.fullAddress,
-                cityZone: addressForm.cityZone,
-                googleMapLink: addressForm.googleMapLink,
-                nearestLocation: addressForm.nearestLocation,
-                deliveryInstructions: addressForm.deliveryInstructions,
-                updatedAt: new Date().toISOString()
-              }
-            : addr
-        );
-        // TODO: Implement API call to update address
-        console.log('Update address:', { addressId: selectedAddress.id, addressData: addressForm });
+        // Prepare API payload with only required fields for update
+        const apiPayload = {
+          addressLine1: addressForm.fullAddress,
+          city: addressForm.city,
+          country: addressForm.country
+        };
+        
+        // Call API to update address
+        const result = await updateKitchenAddress({
+          kitchenId,
+          addressId: selectedAddress.kitchenAddressId || selectedAddress.id,
+          addressData: apiPayload
+        }).unwrap();
+        
+        console.log('Address updated successfully:', result);
+        
+        // Show success dialogue
+        showDialogue('success', 'Address Updated', 'Kitchen address has been updated successfully.');
+        
+        // Reset selected address
+        setSelectedAddress(null);
       }
       
       setShowConfirmModal(false);
@@ -201,6 +288,10 @@ const KitchenAddressesTab = () => {
       setShowAddressModal(false);
     } catch (err) {
       console.error('Failed to save address:', err);
+      
+      // Show error dialogue
+      const errorMessage = err?.data?.message || 'Failed to save address. Please try again.';
+      showDialogue('error', 'Error', errorMessage);
     }
   };
 
@@ -252,13 +343,15 @@ const KitchenAddressesTab = () => {
             Manage the addresses associated with this kitchen.
           </p>
         </div>
-        <button
-          onClick={handleAddAddress}
-          className="px-4 py-2 bg-primary-600 text-white rounded-full hover:bg-primary-700 transition-colors text-sm font-medium flex items-center"
-        >
-          <PlusIcon className="h-4 w-4 mr-1" />
-          Add Address
-        </button>
+        {hasPermission(PERMISSIONS.KITCHEN_ADDRESS_ADD) && (
+          <button
+            onClick={handleAddAddress}
+            className="px-4 py-2 bg-primary-600 text-white rounded-full hover:bg-primary-700 transition-colors text-sm font-medium flex items-center"
+          >
+            <PlusIcon className="h-4 w-4 mr-1" />
+            Add Address
+          </button>
+        )}
       </div>
 
       {!canViewKitchenAddresses ? (
@@ -278,16 +371,10 @@ const KitchenAddressesTab = () => {
             <thead className="bg-neutral-50">
               <tr>
                 <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-neutral-500 uppercase tracking-wider">
-                  Address
+                  Address Line 1
                 </th>
                 <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-neutral-500 uppercase tracking-wider">
-                  City
-                </th>
-                <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-neutral-500 uppercase tracking-wider">
-                  City Zone
-                </th>
-                <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-neutral-500 uppercase tracking-wider">
-                  Nearest Location
+                  Country
                 </th>
                 <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-neutral-500 uppercase tracking-wider">
                   Status
@@ -301,16 +388,10 @@ const KitchenAddressesTab = () => {
               {addresses.map((address) => (
                 <tr key={address.id}>
                   <td className="px-6 py-4 whitespace-normal">
-                    <div className="text-sm text-neutral-900">{address.addressName || 'N/A'}</div>
+                    <div className="text-sm text-neutral-900">{address.addressLine1 || 'N/A'}</div>
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap">
-                    <div className="text-sm text-neutral-900">{address.city || 'N/A'}</div>
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    <div className="text-sm text-neutral-900">{address.zone || 'N/A'}</div>
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    <div className="text-sm text-neutral-900">{address.nearestLocation || 'N/A'}</div>
+                    <div className="text-sm text-neutral-900">{address.country || 'N/A'}</div>
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap">
                     {getStatusBadge(address.status || 'active')}
@@ -396,6 +477,22 @@ const KitchenAddressesTab = () => {
               </div>
               
               <div>
+                <label htmlFor="country" className="block text-sm font-medium text-neutral-700 mb-1">
+                  Country
+                </label>
+                <input
+                  type="text"
+                  id="country"
+                  name="country"
+                  value={addressForm.country}
+                  onChange={(e) => setAddressForm({...addressForm, country: e.target.value})}
+                  className="w-full p-3 border border-neutral-300 rounded-xl focus:ring-primary-500 focus:border-primary-500"
+                  placeholder="Enter country name"
+                  required
+                />
+              </div>
+              
+              <div>
                 <label htmlFor="cityZone" className="block text-sm font-medium text-neutral-700 mb-1">
                   City Zone
                 </label>
@@ -407,7 +504,6 @@ const KitchenAddressesTab = () => {
                   onChange={(e) => setAddressForm({...addressForm, cityZone: e.target.value})}
                   className="w-full p-3 border border-neutral-300 rounded-xl focus:ring-primary-500 focus:border-primary-500"
                   placeholder="Enter city zone"
-                  required
                 />
               </div>
               
@@ -423,7 +519,6 @@ const KitchenAddressesTab = () => {
                   onChange={(e) => setAddressForm({...addressForm, nearestLocation: e.target.value})}
                   className="w-full p-3 border border-neutral-300 rounded-xl focus:ring-primary-500 focus:border-primary-500"
                   placeholder="Enter nearest landmark or location"
-                  required
                 />
               </div>
               
@@ -653,6 +748,15 @@ const KitchenAddressesTab = () => {
           </div>
         </div>
       )}
+
+      {/* DialogueBox for API Success/Error Messages */}
+      <DialogueBox
+        isOpen={dialogueBox.isOpen}
+        onClose={closeDialogue}
+        type={dialogueBox.type}
+        title={dialogueBox.title}
+        message={dialogueBox.message}
+      />
     </div>
   );
 };
