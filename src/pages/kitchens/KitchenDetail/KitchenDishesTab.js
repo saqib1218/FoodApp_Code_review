@@ -6,6 +6,7 @@ import { mockDishes, getDishesByKitchenId, getDishCategories, getDishCuisines, g
 import { useAuth } from '../../../hooks/useAuth';
 import { KitchenContext } from './index';
 import ConfirmationModal from '../../../components/ConfirmationModal';
+import AddDishModal from '../../../components/AddDishModal';
 
 
 
@@ -29,6 +30,7 @@ const KitchenDishesTab = () => {
   // New modal states
   const [showViewDishModal, setShowViewDishModal] = useState(false);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [showAddDishModal, setShowAddDishModal] = useState(false);
   const [deleteComment, setDeleteComment] = useState('');
 
   const [filters, setFilters] = useState({
@@ -68,12 +70,12 @@ const KitchenDishesTab = () => {
     navigate(`/kitchens/${kitchenId}/dishes/${dish.id}`);
   };
   const handleAddDish = () => {
-    navigate(`/kitchens/${kitchenId}/AddEditDish`);
+    setShowAddDishModal(true);
   };
 
-  // Handle edit dish - navigate to edit page
+  // Handle edit dish - navigate to dish detail page
   const handleEditDish = (dish) => {
-    navigate(`/kitchens/${kitchenId}/AddEditDish`);
+    navigate(`/dishes/${dish.id}`);
   };
 
   // Handle view dish - open view modal
@@ -662,6 +664,18 @@ const KitchenDishesTab = () => {
           </div>
         </div>
       )}
+
+      {/* Add Dish Modal */}
+      <AddDishModal
+        isOpen={showAddDishModal}
+        onClose={() => setShowAddDishModal(false)}
+        kitchenId={kitchenId}
+        onDishAdded={(newDish) => {
+          // Add the new dish to the local state
+          setDishes(prev => [...prev, newDish]);
+          setShowAddDishModal(false);
+        }}
+      />
     </div>
   );
 };

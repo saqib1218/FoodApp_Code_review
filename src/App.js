@@ -32,9 +32,11 @@ import PermissionsDemo from './pages/PermissionsDemo';
 import Discounts from './pages/discounts/Discounts';
 import Feedback from './pages/feedbacks/Feedback';
 import FeedbackDetail from './pages/feedbacks/FeedbackDetail';
+// Dish Management
+import DishesList from './pages/dishes/DishesList';
+import DishDetail from './pages/dishes/DishDetail';
 // Protected Route Components
 import ProtectedRoute from './components/ProtectedRoute';
-import AddEditDish from './pages/kitchens/KitchenDetail/AddEditDish/AddEditDish';
 import KitchenDishDetailPage from './pages/kitchens/KitchenDishDetailPage';
 
 // Basic Authentication Route Component
@@ -97,15 +99,21 @@ function App() {
               </ProtectedRoute>
             } />
             
-            <Route path="/kitchens/:id/AddEditDish" element={
-              <ProtectedRoute routeName="kitchens">
-                <AddEditDish />
-              </ProtectedRoute>
-            } />
-            
             <Route path="/onboarding" element={
               <ProtectedRoute routeName="kitchens">
                 <OnboardingQueue />
+              </ProtectedRoute>
+            } />
+            
+            <Route path="/dishes" element={
+              <ProtectedRoute routeName="dishes">
+                <DishesList />
+              </ProtectedRoute>
+            } />
+            
+            <Route path="/dishes/:id" element={
+              <ProtectedRoute routeName="dish-detail">
+                <DishDetail />
               </ProtectedRoute>
             } />
             

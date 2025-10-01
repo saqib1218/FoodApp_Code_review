@@ -48,7 +48,7 @@ export const kitchensApi = apiSlice.injectEndpoints({
     updateKitchen: builder.mutation({
       query: ({ id, ...kitchenData }) => ({
         url: `/admin/kitchens/${id}`,
-        method: 'PUT',
+        method: 'PATCH',
         body: kitchenData,
       }),
       invalidatesTags: (result, error, arg) => [{ type: 'Kitchen', id: arg.id }],
@@ -216,17 +216,39 @@ export const kitchensApi = apiSlice.injectEndpoints({
       ],
     }),
     
-    uploadKitchenMedia: builder.mutation({
-      query: ({ kitchenId, formData }) => ({
+    // Step 1: Get pre-signed S3 upload URL
+    getKitchenMediaUploadUrl: builder.mutation({
+      query: ({ kitchenId, mediaType, categoryType }) => ({
         url: `/admin/kitchens/${kitchenId}/media`,
         method: 'POST',
-        body: formData,
+        body: { mediaType, categoryType },
       }),
-      invalidatesTags: (result, error, arg) => [
-        { type: 'KitchenMedia', id: arg.kitchenId },
-        'KitchenMedia'
-      ],
     }),
+    
+    // Step 2: Upload file to S3 (external call)
+    uploadToS3: builder.mutation({
+      queryFn: async ({ uploadUrl, file, onProgress }) => {
+        try {
+          const response = await fetch(uploadUrl, {
+            method: 'PUT',
+            body: file,
+            headers: {
+              'Content-Type': file.type,
+            },
+          });
+          
+          if (!response.ok) {
+            throw new Error(`S3 upload failed: ${response.statusText}`);
+          }
+          
+          return { data: { success: true, url: uploadUrl.split('?')[0] } };
+        } catch (error) {
+          return { error: { status: 'FETCH_ERROR', error: error.message } };
+        }
+      },
+    }),
+    
+
     
     deleteKitchenMedia: builder.mutation({
       query: ({ kitchenId, mediaId }) => ({
@@ -359,7 +381,9 @@ export const {
   
   // Kitchen Media
   useGetKitchenMediaQuery,
-  useUploadKitchenMediaMutation,
+  useGetKitchenMediaUploadUrlMutation,
+  useUploadToS3Mutation,
+  useConfirmKitchenMediaUploadMutation,
   useDeleteKitchenMediaMutation,
   
   // Kitchen Addresses

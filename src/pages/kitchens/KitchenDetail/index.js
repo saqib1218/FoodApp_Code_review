@@ -1,11 +1,12 @@
 import React, { useState, useEffect, createContext } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
-import { ArrowLeftIcon } from '@heroicons/react/24/outline';
+import { ArrowLeftIcon, PencilIcon, XMarkIcon } from '@heroicons/react/24/outline';
 import { CheckCircleIcon, ClockIcon, XCircleIcon } from '@heroicons/react/24/outline';
-import { useGetKitchenByIdQuery } from '../../../store/api/modules/kitchens/kitchensApi';
+import { useGetKitchenByIdQuery, useUpdateKitchenMutation } from '../../../store/api/modules/kitchens/kitchensApi';
 import { useAuth } from '../../../hooks/useAuth';
 import PermissionGate from '../../../components/PermissionGate';
 import ConfirmationModal from '../../../components/ConfirmationModal';
+import DialogueBox from '../../../components/DialogueBox';
 import { PERMISSIONS } from '../../../contexts/PermissionRegistry';
 
 // Import tab components
@@ -37,14 +38,95 @@ const KitchenDetail = () => {
     skip: !canViewKitchenDetails
   });
   
+  // RTK Query mutation for updating kitchen
+  const [updateKitchen, { isLoading: isUpdatingKitchen }] = useUpdateKitchenMutation();
+  
   // State variables
   const [activeTab, setActiveTab] = useState('partners');
   const [showStatusModal, setShowStatusModal] = useState(false);
   const [newStatus, setNewStatus] = useState('');
   const [statusComment, setStatusComment] = useState('');
+  
+  // Edit kitchen modal state
+  const [showEditModal, setShowEditModal] = useState(false);
+  const [editFormData, setEditFormData] = useState({
+    name: '',
+    tagline: '',
+    bio: ''
+  });
+  
+  // Dialogue box state for API feedback
+  const [dialogueBox, setDialogueBox] = useState({
+    isOpen: false,
+    type: 'success', // 'success' or 'error'
+    title: '',
+    message: ''
+  });
 
   // Extract kitchen data from API response
   const kitchen = kitchenResponse?.data || null;
+
+  // Dialogue box helper functions
+  const showDialogue = (type, title, message) => {
+    setDialogueBox({
+      isOpen: true,
+      type,
+      title,
+      message
+    });
+  };
+
+  const closeDialogue = () => {
+    setDialogueBox({
+      isOpen: false,
+      type: 'success',
+      title: '',
+      message: ''
+    });
+  };
+
+  // Edit kitchen functions
+  const handleEditKitchen = () => {
+    if (kitchen) {
+      setEditFormData({
+        name: kitchen.name || '',
+        tagline: kitchen.tagline || '',
+        bio: kitchen.bio || ''
+      });
+      setShowEditModal(true);
+    }
+  };
+
+  const handleEditFormChange = (e) => {
+    const { name, value } = e.target;
+    setEditFormData(prev => ({
+      ...prev,
+      [name]: value
+    }));
+  };
+
+  const handleUpdateKitchen = async () => {
+    try {
+      const result = await updateKitchen({
+        id: kitchen.id,
+        ...editFormData
+      }).unwrap();
+
+      console.log('Kitchen updated successfully:', result);
+
+      // Show success dialogue
+      showDialogue('success', 'Kitchen Updated', 'Kitchen information has been updated successfully.');
+
+      // Close modal
+      setShowEditModal(false);
+    } catch (err) {
+      console.error('Failed to update kitchen:', err);
+      
+      // Show error dialogue
+      const errorMessage = err?.data?.message || 'Failed to update kitchen information. Please try again.';
+      showDialogue('error', 'Error', errorMessage);
+    }
+  };
 
   // Tab navigation handler
   const handleTabChange = (tab) => {
@@ -191,6 +273,17 @@ const KitchenDetail = () => {
             <div className="ml-4">{getStatusBadge(kitchen.status)}</div>
           </div>
           <div className="flex space-x-3">
+            {/* Edit Kitchen Button */}
+            <PermissionGate permission={PERMISSIONS.KITCHEN_EDIT}>
+              <button
+                onClick={handleEditKitchen}
+                className="px-4 py-2 border border-neutral-300 rounded-full shadow-sm text-sm font-medium text-neutral-700 bg-white hover:bg-neutral-50 flex items-center"
+              >
+                <PencilIcon className="h-4 w-4 mr-2" />
+                Edit Kitchen
+              </button>
+            </PermissionGate>
+            
             {kitchen.status !== 'active' && (
               <button
                 onClick={() => handleStatusUpdate('active')}
@@ -394,6 +487,95 @@ const KitchenDetail = () => {
         confirmButtonText={newStatus === 'active' ? 'Open Kitchen' : 'Close Kitchen'}
         confirmButtonColor={newStatus === 'active' ? 'green' : 'primary'}
         isCommentRequired={true}
+      />
+
+      {/* Edit Kitchen Modal */}
+      {showEditModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-xl shadow-lg max-w-md w-full p-6">
+            <div className="flex justify-between items-center mb-4">
+              <h3 className="text-lg font-medium text-neutral-900">
+                Edit Kitchen Information
+              </h3>
+              <button
+                onClick={() => setShowEditModal(false)}
+                className="text-neutral-500 hover:text-neutral-700"
+              >
+                <XMarkIcon className="h-5 w-5" />
+              </button>
+            </div>
+            
+            <div className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-neutral-700 mb-1">
+                  Kitchen Name *
+                </label>
+                <input
+                  type="text"
+                  name="name"
+                  value={editFormData.name}
+                  onChange={handleEditFormChange}
+                  className="w-full p-3 border border-neutral-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
+                  placeholder="Enter kitchen name"
+                  required
+                />
+              </div>
+              
+              <div>
+                <label className="block text-sm font-medium text-neutral-700 mb-1">
+                  Tagline
+                </label>
+                <input
+                  type="text"
+                  name="tagline"
+                  value={editFormData.tagline}
+                  onChange={handleEditFormChange}
+                  className="w-full p-3 border border-neutral-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
+                  placeholder="Enter kitchen tagline"
+                />
+              </div>
+              
+              <div>
+                <label className="block text-sm font-medium text-neutral-700 mb-1">
+                  Bio
+                </label>
+                <textarea
+                  name="bio"
+                  value={editFormData.bio}
+                  onChange={handleEditFormChange}
+                  rows={4}
+                  className="w-full p-3 border border-neutral-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
+                  placeholder="Enter kitchen bio"
+                />
+              </div>
+            </div>
+            
+            <div className="flex justify-end space-x-3 mt-6">
+              <button
+                onClick={() => setShowEditModal(false)}
+                className="px-4 py-2 bg-white border border-neutral-300 text-neutral-700 rounded-full hover:bg-neutral-50 transition-colors text-sm font-medium"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleUpdateKitchen}
+                disabled={isUpdatingKitchen || !editFormData.name.trim()}
+                className="px-4 py-2 bg-primary-600 text-white rounded-full hover:bg-primary-700 disabled:bg-gray-300 disabled:cursor-not-allowed transition-colors text-sm font-medium"
+              >
+                {isUpdatingKitchen ? 'Updating...' : 'Update Kitchen'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Dialogue Box for API feedback */}
+      <DialogueBox
+        isOpen={dialogueBox.isOpen}
+        onClose={closeDialogue}
+        type={dialogueBox.type}
+        title={dialogueBox.title}
+        message={dialogueBox.message}
       />
     </KitchenContext.Provider>
   );

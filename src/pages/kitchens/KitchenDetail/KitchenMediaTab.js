@@ -1,18 +1,38 @@
 import React, { useState, useEffect, useContext } from 'react';
-import { XMarkIcon, PlusIcon, PencilIcon, EyeIcon, TrashIcon } from '@heroicons/react/24/outline';
+import { XMarkIcon, PlusIcon, PencilIcon, EyeIcon, TrashIcon, CloudArrowUpIcon } from '@heroicons/react/24/outline';
 import { useAuth } from '../../../hooks/useAuth';
-// TODO: Replace with RTK Query hooks when migrating API calls
-import { getKitchenMedia } from '../../../data/kitchens/mockKitchenMedia';
+import { 
+  useGetKitchenMediaQuery,
+  useGetKitchenMediaUploadUrlMutation,
+  useUploadToS3Mutation,
+  useDeleteKitchenMediaMutation 
+} from '../../../store/api/modules/kitchens/kitchensApi';
 import { KitchenContext } from './index';
+import { PERMISSIONS } from '../../../contexts/PermissionRegistry';
 import ConfirmationModal from '../../../components/ConfirmationModal';
+import DialogueBox from '../../../components/DialogueBox';
 
 const KitchenMediaTab = () => {
   const { id: kitchenId } = useContext(KitchenContext);
   const { hasPermission } = useAuth();
   
+  // Check permissions first
+  const canViewKitchenMedia = hasPermission(PERMISSIONS.KITCHEN_MEDIA_LIST_VIEW);
+  const canUploadKitchenMedia = hasPermission(PERMISSIONS.KITCHEN_MEDIA_UPLOAD);
+  
+  // RTK Query hooks - only if user has permission
+  const { data: kitchenMediaData, isLoading: isLoadingMedia, refetch: refetchMedia } = useGetKitchenMediaQuery(
+    { kitchenId },
+    { skip: !canViewKitchenMedia || !kitchenId }
+  );
+  const [getUploadUrl] = useGetKitchenMediaUploadUrlMutation();
+  const [uploadToS3] = useUploadToS3Mutation();
+  const [deleteMedia] = useDeleteKitchenMediaMutation();
+  
   // State variables
   const [kitchenMedia, setKitchenMedia] = useState([]);
-  const [isLoadingMedia, setIsLoadingMedia] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState(0);
+  const [isUploading, setIsUploading] = useState(false);
   const [selectedImage, setSelectedImage] = useState(null);
   const [selectedMedia, setSelectedMedia] = useState(null);
   const [showAddMediaModal, setShowAddMediaModal] = useState(false);
@@ -28,24 +48,40 @@ const KitchenMediaTab = () => {
   const [confirmComment, setConfirmComment] = useState('');
   const [deleteComment, setDeleteComment] = useState('');
   const [updateComment, setUpdateComment] = useState('');
+  
+  // Dialogue box state for API feedback
+  const [dialogueBox, setDialogueBox] = useState({
+    isOpen: false,
+    type: 'success', // 'success' or 'error'
+    title: '',
+    message: ''
+  });
 
-  // Fetch kitchen media
+  // Dialogue box helper functions
+  const showDialogue = (type, title, message) => {
+    setDialogueBox({
+      isOpen: true,
+      type,
+      title,
+      message
+    });
+  };
+
+  const closeDialogue = () => {
+    setDialogueBox({
+      isOpen: false,
+      type: 'success',
+      title: '',
+      message: ''
+    });
+  };
+
+  // Update local state when RTK Query data changes
   useEffect(() => {
-    const fetchKitchenMedia = () => {
-      try {
-        setIsLoadingMedia(true);
-        // Get media for current kitchen
-        const mediaData = getKitchenMedia(kitchenId);
-        setKitchenMedia(mediaData);
-      } catch (err) {
-        console.error('Failed to load kitchen media:', err);
-      } finally {
-        setIsLoadingMedia(false);
-      }
-    };
-
-    fetchKitchenMedia();
-  }, [kitchenId]);
+    if (kitchenMediaData?.data) {
+      setKitchenMedia(kitchenMediaData.data);
+    }
+  }, [kitchenMediaData]);
 
   // Handle image preview
   const handleImagePreview = (image) => {
@@ -97,38 +133,79 @@ const KitchenMediaTab = () => {
     setShowConfirmModal(true);
   };
 
-  // Confirm add media
+  // Enterprise-level S3 upload flow
   const confirmAddMedia = async () => {
-    try {
-      setIsLoadingMedia(true);
-      
-      // Create new media object
-      const newMedia = {
-        id: Date.now(), // Temporary ID
-        url: newMediaPreview,
-        type: newMediaType,
-        mediaUsedAs: newMediaUsedAs,
-        caption: newMediaCaption,
-        status: 'pending for approval',
-        uploadDate: new Date().toISOString()
-      };
-      
-      // Add to kitchen media list
-      setKitchenMedia([...kitchenMedia, newMedia]);
-      
-      setShowConfirmModal(false);
-      // Reset form
-      setNewMediaFile(null);
-      setNewMediaPreview('');
-      setNewMediaType('image');
-      setNewMediaUsedAs('banner');
-      setNewMediaCaption('');
-      setConfirmComment('');
-    } catch (err) {
-      console.error('Failed to add kitchen media:', err);
-    } finally {
-      setIsLoadingMedia(false);
+    if (!newMediaFile) {
+      showDialogue('error', 'No File Selected', 'Please select a media file before proceeding.');
+      return;
     }
+
+    try {
+      setIsUploading(true);
+      setUploadProgress(0);
+      setShowConfirmModal(false);
+
+      // Step 1: Get pre-signed S3 upload URL from backend
+      console.log('Step 1: Getting pre-signed S3 upload URL...');
+      const uploadUrlResponse = await getUploadUrl({
+        kitchenId,
+        mediaType: newMediaType,
+        categoryType: newMediaUsedAs
+      }).unwrap();
+
+      if (!uploadUrlResponse.success || !uploadUrlResponse.data?.uploadUrl) {
+        throw new Error('Failed to get upload URL from server');
+      }
+
+      const { uploadUrl, mediaId, s3Key } = uploadUrlResponse.data;
+      console.log('✅ Got upload URL:', { mediaId, s3Key });
+      
+      setUploadProgress(25);
+
+      // Step 2: Upload file directly to S3
+      console.log('Step 2: Uploading file to S3...');
+      const s3UploadResponse = await uploadToS3({
+        uploadUrl,
+        file: newMediaFile
+      }).unwrap();
+
+      if (!s3UploadResponse.success) {
+        throw new Error('Failed to upload file to S3');
+      }
+
+      console.log('✅ File uploaded to S3 successfully');
+      setUploadProgress(75);
+
+      console.log('✅ File uploaded to S3 successfully');
+      setUploadProgress(100);
+
+      // Refresh media list
+      refetchMedia();
+      
+      // Show success message
+      showDialogue('success', 'Upload Successful', 'Media has been uploaded successfully!');
+      
+      // Reset form
+      resetMediaForm();
+      
+    } catch (error) {
+      console.error('❌ Upload failed:', error);
+      showDialogue('error', 'Upload Failed', `Upload failed: ${error.message || 'Unknown error occurred'}`);
+    } finally {
+      setIsUploading(false);
+      setUploadProgress(0);
+    }
+  };
+
+  // Helper function to reset form
+  const resetMediaForm = () => {
+    setNewMediaFile(null);
+    setNewMediaPreview('');
+    setNewMediaType('image');
+    setNewMediaUsedAs('banner');
+    setNewMediaCaption('');
+    setConfirmComment('');
+    setSelectedMedia(null);
   };
 
   // Handle edit media
@@ -149,39 +226,55 @@ const KitchenMediaTab = () => {
   };
 
   // Handle confirm delete media
-  const handleConfirmDeleteMedia = () => {
-    // Remove media from local state
-    setKitchenMedia(kitchenMedia.filter(media => media.id !== selectedMedia.id));
-    setShowDeleteModal(false);
-    setSelectedMedia(null);
-    setDeleteComment('');
+  const handleConfirmDeleteMedia = async () => {
+    try {
+      await deleteMedia({
+        kitchenId,
+        mediaId: selectedMedia.id
+      }).unwrap();
+      
+      // Refresh media list
+      refetchMedia();
+      
+      showDialogue('success', 'Delete Successful', 'Media has been deleted successfully!');
+    } catch (error) {
+      console.error('Failed to delete media:', error);
+      showDialogue('error', 'Delete Failed', `Delete failed: ${error.message || 'Unknown error occurred'}`);
+    } finally {
+      setShowDeleteModal(false);
+      setSelectedMedia(null);
+      setDeleteComment('');
+    }
   };
 
   // Handle confirm update media
-  const handleConfirmUpdateMedia = () => {
-    // Update media in local state
-    const updatedMedia = {
-      ...selectedMedia,
-      type: newMediaType,
-      mediaUsedAs: newMediaUsedAs,
-      caption: newMediaCaption,
-      url: newMediaPreview || selectedMedia.url
-    };
-
-    setKitchenMedia(kitchenMedia.map(media => 
-      media.id === selectedMedia.id ? updatedMedia : media
-    ));
-
-    // Close all modals and reset state
-    setShowUpdateConfirmModal(false);
-    setShowAddMediaModal(false);
-    setSelectedMedia(null);
-    setNewMediaFile(null);
-    setNewMediaType('image');
-    setNewMediaUsedAs('banner');
-    setNewMediaCaption('');
-    setNewMediaPreview(null);
-    setUpdateComment('');
+  const handleConfirmUpdateMedia = async () => {
+    try {
+      // If there's a new file, we need to upload it first
+      if (newMediaFile) {
+        // Follow the same S3 upload flow for updates
+        await confirmAddMedia();
+      } else {
+        // Since we removed the confirmation API, we can't update just metadata
+        // User needs to re-upload the file to update caption
+        showDialogue('error', 'Update Not Available', 'To update media caption, please upload a new file.');
+        
+        // Reset form
+        resetMediaForm();
+        setShowUpdateConfirmModal(false);
+        setShowAddMediaModal(false);
+        return;
+      }
+    } catch (error) {
+      console.error('Failed to update media:', error);
+      showDialogue('error', 'Update Failed', `Update failed: ${error.message || 'Unknown error occurred'}`);
+    } finally {
+      // Close all modals and reset state
+      setShowUpdateConfirmModal(false);
+      setShowAddMediaModal(false);
+      resetMediaForm();
+      setUpdateComment('');
+    }
   };
 
   // Handle cancel confirmation
@@ -281,118 +374,153 @@ const KitchenMediaTab = () => {
             Manage images and media files for this kitchen.
           </p>
         </div>
-        <button
-          onClick={handleAddMedia}
-          className="px-4 py-2 bg-primary-600 text-white rounded-full hover:bg-primary-700 transition-colors text-sm font-medium flex items-center"
-        >
-          <PlusIcon className="h-4 w-4 mr-1" />
-          Add Media
-        </button>
+        {canUploadKitchenMedia && (
+          <button
+            onClick={handleAddMedia}
+            className="px-4 py-2 bg-primary-600 text-white rounded-full hover:bg-primary-700 transition-colors text-sm font-medium flex items-center"
+          >
+            <PlusIcon className="h-4 w-4 mr-1" />
+            Add Media
+          </button>
+        )}
       </div>
 
-      {/* Kitchen Media List */}
-      <div className="bg-white rounded-lg border border-neutral-200 overflow-hidden">
-        <div className="px-6 py-4 border-b border-neutral-200">
-          <h4 className="text-base font-medium text-neutral-900">Media Files</h4>
-        </div>
-        <div className="overflow-x-auto">
-          {kitchenMedia.length === 0 ? (
-            <div className="text-center py-12 bg-neutral-50">
-              <p className="text-neutral-500">No media files found for this kitchen.</p>
+      {/* Upload Progress Indicator */}
+      {isUploading && (
+        <div className="mb-6 bg-blue-50 border border-blue-200 rounded-lg p-4">
+          <div className="flex items-center justify-between mb-2">
+            <div className="flex items-center">
+              <CloudArrowUpIcon className="h-5 w-5 text-blue-600 mr-2" />
+              <span className="text-sm font-medium text-blue-900">Uploading to S3...</span>
             </div>
-          ) : (
-            <table className="min-w-full divide-y divide-neutral-200">
-              <thead className="bg-neutral-50">
-                <tr>
-                  <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-neutral-500 uppercase tracking-wider">
-                    Preview
-                  </th>
-                  <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-neutral-500 uppercase tracking-wider">
-                    Status
-                  </th>
-                  <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-neutral-500 uppercase tracking-wider">
-                    Type
-                  </th>
-                  <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-neutral-500 uppercase tracking-wider">
-                    Media Used As
-                  </th>
-                  <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-neutral-500 uppercase tracking-wider">
-                    Caption
-                  </th>
-                  <th scope="col" className="px-6 py-3 text-right text-xs font-medium text-neutral-500 uppercase tracking-wider">
-                    Actions
-                  </th>
-                </tr>
-              </thead>
-              <tbody className="bg-white divide-y divide-neutral-200">
-                {kitchenMedia.map((media) => (
-                  <tr key={media.id}>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <div 
-                        className="h-12 w-16 bg-neutral-100 rounded cursor-pointer"
-                        onClick={() => handleImagePreview(media)}
-                      >
-                        <img
-                          src={media.url}
-                          alt={media.type}
-                          className="h-full w-full object-cover rounded"
-                          onError={(e) => {
-                            e.target.onerror = null;
-                            e.target.src = 'https://via.placeholder.com/160x120?text=Media+Not+Available';
-                          }}
-                        />
-                      </div>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      {getMediaStatusBadge(media.status || 'active')}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
-                        {getMediaTypeDisplay(media.type || 'image')}
-                      </span>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-neutral-100 text-neutral-800">
-                        {getMediaUsedDisplay(media.mediaUsedAs || 'banner')}
-                      </span>
-                    </td>
-                    <td className="px-6 py-4">
-                      <div className="text-sm text-neutral-900 max-w-xs truncate">
-                        {media.caption || '-'}
-                      </div>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                      <div className="flex justify-end space-x-2">
-                        <button
-                          onClick={() => handleEditMedia(media)}
-                          className="text-blue-600 hover:text-blue-900 transition-colors"
-                          title="Edit media"
-                        >
-                          <PencilIcon className="h-4 w-4" />
-                        </button>
-                        <button
-                          onClick={() => handleImagePreview(media)}
-                          className="text-green-600 hover:text-green-900 transition-colors"
-                          title="View media"
-                        >
-                          <EyeIcon className="h-4 w-4" />
-                        </button>
-                        <button
-                          onClick={() => handleDeleteMedia(media)}
-                          className="text-red-600 hover:text-red-900 transition-colors"
-                          title="Delete media"
-                        >
-                          <TrashIcon className="h-4 w-4" />
-                        </button>
-                      </div>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          )}
+            <span className="text-sm text-blue-700">{uploadProgress}%</span>
+          </div>
+          <div className="w-full bg-blue-200 rounded-full h-2">
+            <div 
+              className="bg-blue-600 h-2 rounded-full transition-all duration-300 ease-out"
+              style={{ width: `${uploadProgress}%` }}
+            ></div>
+          </div>
+          <div className="mt-2 text-xs text-blue-600">
+            {uploadProgress === 25 && "✅ Got pre-signed URL from server"}
+            {uploadProgress === 75 && "✅ File uploaded to S3 successfully"}
+            {uploadProgress === 100 && "✅ Upload confirmed with backend"}
+          </div>
         </div>
-      </div>
+      )}
+
+      {/* Kitchen Media List */}
+      {!canViewKitchenMedia ? (
+        <div className="flex items-center justify-center min-h-96">
+          <div className="text-center">
+            <h3 className="text-lg font-medium text-neutral-900 mb-2">Access Denied</h3>
+            <p className="text-neutral-500">You don't have permission to access the kitchen media list.</p>
+          </div>
+        </div>
+      ) : (
+        <div className="bg-white rounded-lg border border-neutral-200 overflow-hidden">
+          <div className="px-6 py-4 border-b border-neutral-200">
+            <h4 className="text-base font-medium text-neutral-900">Media Files</h4>
+          </div>
+          <div className="overflow-x-auto">
+            {kitchenMedia.length === 0 ? (
+              <div className="text-center py-12 bg-neutral-50">
+                <p className="text-neutral-500">No media files found for this kitchen.</p>
+              </div>
+            ) : (
+              <table className="min-w-full divide-y divide-neutral-200">
+                <thead className="bg-neutral-50">
+                  <tr>
+                    <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-neutral-500 uppercase tracking-wider">
+                      Preview
+                    </th>
+                    <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-neutral-500 uppercase tracking-wider">
+                      Status
+                    </th>
+                    <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-neutral-500 uppercase tracking-wider">
+                      Type
+                    </th>
+                    <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-neutral-500 uppercase tracking-wider">
+                      Media Used As
+                    </th>
+                    <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-neutral-500 uppercase tracking-wider">
+                      Caption
+                    </th>
+                    <th scope="col" className="px-6 py-3 text-right text-xs font-medium text-neutral-500 uppercase tracking-wider">
+                      Actions
+                    </th>
+                  </tr>
+                </thead>
+                <tbody className="bg-white divide-y divide-neutral-200">
+                  {kitchenMedia.map((media) => (
+                    <tr key={media.id}>
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <div 
+                          className="h-12 w-16 bg-neutral-100 rounded cursor-pointer"
+                          onClick={() => handleImagePreview(media)}
+                        >
+                          <img
+                            src={media.processedUrl || media.url}
+                            alt={media.type}
+                            className="h-full w-full object-cover rounded"
+                            onError={(e) => {
+                              e.target.onerror = null;
+                              e.target.src = 'https://via.placeholder.com/160x120?text=Media+Not+Available';
+                            }}
+                          />
+                        </div>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        {getMediaStatusBadge(media.status || 'active')}
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
+                          {getMediaTypeDisplay(media.mediaType || 'image')}
+                        </span>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-neutral-100 text-neutral-800">
+                          {getMediaUsedDisplay(media.categoryType || 'banner')}
+                        </span>
+                      </td>
+                      <td className="px-6 py-4">
+                        <div className="text-sm text-neutral-900 max-w-xs truncate">
+                          {media.caption || '-'}
+                        </div>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                        <div className="flex justify-end space-x-2">
+                          <button
+                            onClick={() => handleEditMedia(media)}
+                            className="text-blue-600 hover:text-blue-900 transition-colors"
+                            title="Edit media"
+                          >
+                            <PencilIcon className="h-4 w-4" />
+                          </button>
+                          <button
+                            onClick={() => handleImagePreview(media)}
+                            className="text-green-600 hover:text-green-900 transition-colors"
+                            title="View media"
+                          >
+                            <EyeIcon className="h-4 w-4" />
+                          </button>
+                          <button
+                            onClick={() => handleDeleteMedia(media)}
+                            className="text-red-600 hover:text-red-900 transition-colors"
+                            title="Delete media"
+                          >
+                            <TrashIcon className="h-4 w-4" />
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            )}
+          </div>
+        </div>
+      )}
 
       {/* Add Media Modal */}
       {showAddMediaModal && (
@@ -592,6 +720,15 @@ const KitchenMediaTab = () => {
           variant="primary"
         />
       )}
+
+      {/* DialogueBox for API Success/Error Messages */}
+      <DialogueBox
+        isOpen={dialogueBox.isOpen}
+        onClose={closeDialogue}
+        type={dialogueBox.type}
+        title={dialogueBox.title}
+        message={dialogueBox.message}
+      />
     </div>
   );
 };

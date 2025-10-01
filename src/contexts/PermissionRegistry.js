@@ -35,6 +35,8 @@ export const PERMISSIONS = {
   KITCHEN_PARTNER_LIST_VIEW: 'admin.kitchen.partner.list.view',
   KITCHEN_ADDRESS_LIST_VIEW: 'admin.kitchen.address.list.view',
   KITCHEN_AVAILABILITY_VIEW: 'admin.kitchen.availability.view',
+  KITCHEN_MEDIA_LIST_VIEW: 'admin.kitchen.media.list.view',
+  KITCHEN_MEDIA_UPLOAD: 'admin.kitchen.media.upload',
   KITCHEN_EDIT: 'admin.kitchen.edit',
   KITCHEN_CREATE: 'admin.kitchen.create',
   KITCHEN_ADDRESS_ADD: 'admin.kitchen.address.add',
@@ -65,13 +67,46 @@ export const PERMISSIONS = {
   SETTINGS_VIEW: 'admin.setting.view',
 
   // Engagement
-  ENGAGEMENT_VIEW: 'admin.engagement.view'
+  ENGAGEMENT_VIEW: 'admin.engagement.view',
+
+  // Dish Management
+  DISH_VIEW: 'admin.dish.view',
+  DISH_LIST_VIEW: 'admin.dish.list.view',
+  DISH_DETAIL_VIEW: 'admin.dish.detail.view',
+  DISH_CREATE: 'admin.dish.create',
+  DISH_EDIT: 'admin.dish.edit',
+  DISH_DELETE: 'admin.dish.delete',
+  
+  // Dish Variants
+  DISH_VARIANT_LIST_VIEW: 'admin.dish.variant.list.view',
+  DISH_VARIANT_CREATE: 'admin.dish.variant.create',
+  DISH_VARIANT_EDIT: 'admin.dish.variant.edit',
+  DISH_VARIANT_DELETE: 'admin.dish.variant.delete',
+  
+  // Dish Availability
+  DISH_AVAILABILITY_LIST_VIEW: 'admin.dish.availability.list.view',
+  DISH_AVAILABILITY_CREATE: 'admin.dish.availability.create',
+  DISH_AVAILABILITY_EDIT: 'admin.dish.availability.edit',
+  DISH_AVAILABILITY_DELETE: 'admin.dish.availability.delete',
+  
+  // Dish Categories
+  DISH_CATEGORY_LIST_VIEW: 'admin.dish.category.list.view',
+  DISH_CATEGORY_CREATE: 'admin.dish.category.create',
+  DISH_CATEGORY_EDIT: 'admin.dish.category.edit',
+  DISH_CATEGORY_DELETE: 'admin.dish.category.delete',
+  
+  // Dish Media
+  DISH_MEDIA_LIST_VIEW: 'admin.dish.media.list.view',
+  DISH_MEDIA_UPLOAD: 'admin.dish.media.upload',
+  DISH_MEDIA_DELETE: 'admin.dish.media.delete'
 };
 
 // Route-based permission mapping - Maps route names to required permissions
 export const ROUTE_PERMISSIONS = {
   'dashboard': [PERMISSIONS.DASHBOARD_VIEW],
   'kitchens': [PERMISSIONS.KITCHEN_VIEW],
+  'dishes': [PERMISSIONS.DISH_VIEW],
+  // 'dish-detail': No permission required - accessible to all authenticated users
   'orders': [PERMISSIONS.ORDER_VIEW],
   'customers': [PERMISSIONS.CUSTOMER_VIEW],
   'partners': [PERMISSIONS.PARTNER_LIST_VIEW],
@@ -104,6 +139,12 @@ export const NAVIGATION_ITEMS = [
     path: '/kitchens',
     icon: 'BuildingStorefrontIcon',
     requiredPermissions: [PERMISSIONS.KITCHEN_VIEW]
+  },
+  {
+    name: 'Dishes',
+    path: '/dishes',
+    icon: 'CakeIcon',
+    requiredPermissions: [PERMISSIONS.DISH_VIEW]
   },
   {
     name: 'Partners',
