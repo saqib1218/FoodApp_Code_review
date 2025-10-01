@@ -71,8 +71,9 @@ const DishDetail = () => {
         status: 'active',
         category: 'main-course',
         course: 'dinner',
-        tags: ['spicy', 'traditional', 'rice'],
-        cuisine: ['Indian', 'Pakistani'],
+        tags: ['Spicy', 'Traditional'],
+        cuisine: ['Pakistani', 'Indian'],
+        dietaryFlags: ['Halal', 'High Protein'],
         allowCustomization: true,
         allowNegotiation: false,
         isSoldOut: false,
@@ -241,8 +242,8 @@ const DishDetail = () => {
               </div>
             </div>
             
-            {/* Tags and Cuisine */}
-            {(dish.tags?.length > 0 || dish.cuisine?.length > 0) && (
+            {/* Tags, Cuisine, and Dietary Flags */}
+            {(dish.tags?.length > 0 || dish.cuisine?.length > 0 || dish.dietaryFlags?.length > 0) && (
               <div className="mb-4 space-y-2">
                 {dish.tags?.length > 0 && (
                   <div>
@@ -269,6 +270,21 @@ const DishDetail = () => {
                           className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-green-100 text-green-800"
                         >
                           {cuisine}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                )}
+                {dish.dietaryFlags?.length > 0 && (
+                  <div>
+                    <span className="text-sm font-medium text-neutral-700 mr-2">Dietary:</span>
+                    <div className="inline-flex flex-wrap gap-1">
+                      {dish.dietaryFlags.map((flag, index) => (
+                        <span
+                          key={index}
+                          className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-blue-100 text-blue-800"
+                        >
+                          {flag}
                         </span>
                       ))}
                     </div>

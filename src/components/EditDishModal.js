@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { XMarkIcon } from '@heroicons/react/24/outline';
 import DialogueBox from './DialogueBox';
+import dishDropdownData from '../data/dishDropdown/dishDropdownData.json';
 
 const EditDishModal = ({ isOpen, onClose, dish, onSave }) => {
   const [formData, setFormData] = useState({
@@ -11,14 +12,13 @@ const EditDishModal = ({ isOpen, onClose, dish, onSave }) => {
     course: '',
     tags: [],
     cuisine: [],
+    dietaryFlags: [],
     allowCustomization: false,
     allowNegotiation: false,
     isSoldOut: false
   });
   
   const [isLoading, setIsLoading] = useState(false);
-  const [tagInput, setTagInput] = useState('');
-  const [cuisineInput, setCuisineInput] = useState('');
   
   // Dialogue box state for feedback
   const [dialogueBox, setDialogueBox] = useState({
@@ -28,22 +28,8 @@ const EditDishModal = ({ isOpen, onClose, dish, onSave }) => {
     message: ''
   });
 
-  // Mock data for dropdowns
-  const categories = [
-    { id: 'appetizer', name: 'Appetizer' },
-    { id: 'main-course', name: 'Main Course' },
-    { id: 'dessert', name: 'Dessert' },
-    { id: 'beverage', name: 'Beverage' },
-    { id: 'snack', name: 'Snack' }
-  ];
-
-  const courses = [
-    { id: 'breakfast', name: 'Breakfast' },
-    { id: 'lunch', name: 'Lunch' },
-    { id: 'dinner', name: 'Dinner' },
-    { id: 'brunch', name: 'Brunch' },
-    { id: 'snack', name: 'Snack' }
-  ];
+  // Get dropdown data from JSON file
+  const { dishCategories, dishCourseTypes, dishTags, dishCuisines, dishDietaryFlags } = dishDropdownData;
 
   // Initialize form data when dish changes
   useEffect(() => {
@@ -56,6 +42,7 @@ const EditDishModal = ({ isOpen, onClose, dish, onSave }) => {
         course: dish.course || '',
         tags: dish.tags || [],
         cuisine: dish.cuisine || [],
+        dietaryFlags: dish.dietaryFlags || [],
         allowCustomization: dish.allowCustomization || false,
         allowNegotiation: dish.allowNegotiation || false,
         isSoldOut: dish.isSoldOut || false
@@ -90,43 +77,33 @@ const EditDishModal = ({ isOpen, onClose, dish, onSave }) => {
     }));
   };
 
-  const handleAddTag = (e) => {
-    if (e.key === 'Enter' && tagInput.trim()) {
-      e.preventDefault();
-      if (!formData.tags.includes(tagInput.trim())) {
-        setFormData(prev => ({
-          ...prev,
-          tags: [...prev.tags, tagInput.trim()]
-        }));
-      }
-      setTagInput('');
+  const handleMultiSelectChange = (fieldName, value) => {
+    setFormData(prev => {
+      const currentValues = prev[fieldName] || [];
+      const isSelected = currentValues.includes(value);
+      
+      return {
+        ...prev,
+        [fieldName]: isSelected 
+          ? currentValues.filter(item => item !== value)
+          : [...currentValues, value]
+      };
+    });
+  };
+
+  const handleDropdownSelect = (fieldName, value) => {
+    if (value && !formData[fieldName].includes(value)) {
+      setFormData(prev => ({
+        ...prev,
+        [fieldName]: [...prev[fieldName], value]
+      }));
     }
   };
 
-  const handleRemoveTag = (tagToRemove) => {
+  const handleRemoveItem = (fieldName, valueToRemove) => {
     setFormData(prev => ({
       ...prev,
-      tags: prev.tags.filter(tag => tag !== tagToRemove)
-    }));
-  };
-
-  const handleAddCuisine = (e) => {
-    if (e.key === 'Enter' && cuisineInput.trim()) {
-      e.preventDefault();
-      if (!formData.cuisine.includes(cuisineInput.trim())) {
-        setFormData(prev => ({
-          ...prev,
-          cuisine: [...prev.cuisine, cuisineInput.trim()]
-        }));
-      }
-      setCuisineInput('');
-    }
-  };
-
-  const handleRemoveCuisine = (cuisineToRemove) => {
-    setFormData(prev => ({
-      ...prev,
-      cuisine: prev.cuisine.filter(cuisine => cuisine !== cuisineToRemove)
+      [fieldName]: prev[fieldName].filter(item => item !== valueToRemove)
     }));
   };
 
@@ -256,8 +233,8 @@ const EditDishModal = ({ isOpen, onClose, dish, onSave }) => {
                     className="w-full p-3 border border-neutral-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
                   >
                     <option value="">Select category</option>
-                    {categories.map(category => (
-                      <option key={category.id} value={category.id}>
+                    {dishCategories.map(category => (
+                      <option key={category.id} value={category.name}>
                         {category.name}
                       </option>
                     ))}
@@ -275,8 +252,8 @@ const EditDishModal = ({ isOpen, onClose, dish, onSave }) => {
                     className="w-full p-3 border border-neutral-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
                   >
                     <option value="">Select course</option>
-                    {courses.map(course => (
-                      <option key={course.id} value={course.id}>
+                    {dishCourseTypes.map(course => (
+                      <option key={course.id} value={course.name}>
                         {course.name}
                       </option>
                     ))}
@@ -289,14 +266,21 @@ const EditDishModal = ({ isOpen, onClose, dish, onSave }) => {
                 <label className="block text-sm font-medium text-neutral-700 mb-1">
                   Dish Tags
                 </label>
-                <input
-                  type="text"
-                  value={tagInput}
-                  onChange={(e) => setTagInput(e.target.value)}
-                  onKeyDown={handleAddTag}
+                <select
+                  value=""
+                  onChange={(e) => {
+                    handleDropdownSelect('tags', e.target.value);
+                    e.target.value = ''; // Reset dropdown
+                  }}
                   className="w-full p-3 border border-neutral-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
-                  placeholder="Type and press Enter to add tags"
-                />
+                >
+                  <option value="">Select tags</option>
+                  {dishTags.map(tag => (
+                    <option key={tag.id} value={tag.name}>
+                      {tag.name}
+                    </option>
+                  ))}
+                </select>
                 {formData.tags.length > 0 && (
                   <div className="flex flex-wrap gap-2 mt-2">
                     {formData.tags.map((tag, index) => (
@@ -307,7 +291,7 @@ const EditDishModal = ({ isOpen, onClose, dish, onSave }) => {
                         {tag}
                         <button
                           type="button"
-                          onClick={() => handleRemoveTag(tag)}
+                          onClick={() => handleRemoveItem('tags', tag)}
                           className="ml-1 text-primary-600 hover:text-primary-800"
                         >
                           ×
@@ -323,14 +307,21 @@ const EditDishModal = ({ isOpen, onClose, dish, onSave }) => {
                 <label className="block text-sm font-medium text-neutral-700 mb-1">
                   Dish Cuisine
                 </label>
-                <input
-                  type="text"
-                  value={cuisineInput}
-                  onChange={(e) => setCuisineInput(e.target.value)}
-                  onKeyDown={handleAddCuisine}
+                <select
+                  value=""
+                  onChange={(e) => {
+                    handleDropdownSelect('cuisine', e.target.value);
+                    e.target.value = ''; // Reset dropdown
+                  }}
                   className="w-full p-3 border border-neutral-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
-                  placeholder="Type and press Enter to add cuisine tags"
-                />
+                >
+                  <option value="">Select cuisine</option>
+                  {dishCuisines.map(cuisine => (
+                    <option key={cuisine.id} value={cuisine.name}>
+                      {cuisine.name}
+                    </option>
+                  ))}
+                </select>
                 {formData.cuisine.length > 0 && (
                   <div className="flex flex-wrap gap-2 mt-2">
                     {formData.cuisine.map((cuisine, index) => (
@@ -341,8 +332,49 @@ const EditDishModal = ({ isOpen, onClose, dish, onSave }) => {
                         {cuisine}
                         <button
                           type="button"
-                          onClick={() => handleRemoveCuisine(cuisine)}
+                          onClick={() => handleRemoveItem('cuisine', cuisine)}
                           className="ml-1 text-green-600 hover:text-green-800"
+                        >
+                          ×
+                        </button>
+                      </span>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              {/* Dish Dietary Flags */}
+              <div>
+                <label className="block text-sm font-medium text-neutral-700 mb-1">
+                  Dietary Flags
+                </label>
+                <select
+                  value=""
+                  onChange={(e) => {
+                    handleDropdownSelect('dietaryFlags', e.target.value);
+                    e.target.value = ''; // Reset dropdown
+                  }}
+                  className="w-full p-3 border border-neutral-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
+                >
+                  <option value="">Select dietary flag</option>
+                  {dishDietaryFlags.map(flag => (
+                    <option key={flag.id} value={flag.name}>
+                      {flag.name}
+                    </option>
+                  ))}
+                </select>
+                {formData.dietaryFlags.length > 0 && (
+                  <div className="flex flex-wrap gap-2 mt-2">
+                    {formData.dietaryFlags.map((flag, index) => (
+                      <span
+                        key={index}
+                        className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800"
+                      >
+                        {flag}
+                        <button
+                          type="button"
+                          onClick={() => handleRemoveItem('dietaryFlags', flag)}
+                          className="ml-1 text-blue-600 hover:text-blue-800"
                         >
                           ×
                         </button>

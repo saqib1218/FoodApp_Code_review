@@ -1,0 +1,59 @@
+{
+  "dishTags": [
+    { "id": 1, "name": "Spicy" },
+    { "id": 2, "name": "Sweet" },
+    { "id": 3, "name": "Sweet Lover" },
+    { "id": 4, "name": "Healthy" },
+    { "id": 5, "name": "High Protein" },
+    { "id": 6, "name": "Low Carb" },
+    { "id": 7, "name": "Kids Special" },
+    { "id": 8, "name": "Party Special" },
+    { "id": 9, "name": "Eid Special" },
+    { "id": 10, "name": "Ramadan Special" },
+    { "id": 11, "name": "Wedding Special" },
+    { "id": 12, "name": "Quick Bite" },
+    { "id": 13, "name": "Chef Special" },
+    { "id": 14, "name": "Traditional" },
+    { "id": 15, "name": "Modern Fusion" },
+    { "id": 16, "name": "Budget Friendly" }
+  ],
+  "dishCategories": [
+    { "id": 1, "name": "Custom" },
+    { "id": 2, "name": "Special Event" },
+    { "id": 3, "name": "Home Catering" },
+    { "id": 4, "name": "Weekly Menu" },
+    { "id": 5, "name": "Frozen" },
+    { "id": 6, "name": "Side On" }
+  ],
+  "dishCuisines": [
+    { "id": 1, "name": "Pakistani" },
+    { "id": 2, "name": "Desi" },
+    { "id": 3, "name": "Indian" },
+    { "id": 4, "name": "Middle Eastern" },
+    { "id": 5, "name": "Turkish" },
+    { "id": 6, "name": "Afghani" },
+    { "id": 7, "name": "Italian" },
+    { "id": 8, "name": "Chinese" },
+    { "id": 9, "name": "Thai" },
+    { "id": 10, "name": "Japanese" },
+    { "id": 11, "name": "Korean" }
+  ],
+  "dishCourseTypes": [
+    { "id": 1, "name": "Starter" },
+    { "id": 2, "name": "Main Course" },
+    { "id": 3, "name": "Side Dish" },
+    { "id": 4, "name": "Dessert" },
+    { "id": 5, "name": "Beverage" }
+  ],
+  "dishDietaryFlags": [
+    { "id": 1, "name": "Halal" },
+    { "id": 2, "name": "Vegetarian" },
+    { "id": 3, "name": "Vegan" },
+    { "id": 4, "name": "Gluten Free" },
+    { "id": 5, "name": "Sugar Free" },
+    { "id": 6, "name": "Low Fat" },
+    { "id": 7, "name": "High Protein" },
+    { "id": 8, "name": "Dairy Free" },
+    { "id": 9, "name": "Nut Free" }
+  ]
+}

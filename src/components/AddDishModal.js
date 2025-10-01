@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { XMarkIcon } from '@heroicons/react/24/outline';
 import DialogueBox from './DialogueBox';
+import dishDropdownData from '../data/dishDropdown/dishDropdownData.json';
 
 const AddDishModal = ({ isOpen, onClose, onSave, kitchenId, onDishAdded }) => {
   const [formData, setFormData] = useState({
@@ -12,14 +13,8 @@ const AddDishModal = ({ isOpen, onClose, onSave, kitchenId, onDishAdded }) => {
   
   const [isLoading, setIsLoading] = useState(false);
   
-  // Mock data for categories dropdown
-  const categories = [
-    { id: 'appetizer', name: 'Appetizer' },
-    { id: 'main-course', name: 'Main Course' },
-    { id: 'dessert', name: 'Dessert' },
-    { id: 'beverage', name: 'Beverage' },
-    { id: 'snack', name: 'Snack' }
-  ];
+  // Get dropdown data from JSON file
+  const { dishCategories } = dishDropdownData;
   
   // Dialogue box state for feedback
   const [dialogueBox, setDialogueBox] = useState({
@@ -55,6 +50,8 @@ const AddDishModal = ({ isOpen, onClose, onSave, kitchenId, onDishAdded }) => {
       [name]: value
     }));
   };
+
+
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -180,13 +177,17 @@ const AddDishModal = ({ isOpen, onClose, onSave, kitchenId, onDishAdded }) => {
                   disabled={isLoading}
                 >
                   <option value="">Select category</option>
-                  {categories.map(category => (
-                    <option key={category.id} value={category.id}>
+                  {dishCategories.map(category => (
+                    <option key={category.id} value={category.name}>
                       {category.name}
                     </option>
                   ))}
                 </select>
               </div>
+
+
+
+
 
               {/* Story */}
               <div>
