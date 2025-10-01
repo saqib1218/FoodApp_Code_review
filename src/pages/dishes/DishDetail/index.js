@@ -8,6 +8,7 @@ import DishAvailabilityTab from './DishAvailabilityTab';
 import DishCategoryTab from './DishCategoryTab';
 import DishMediaTab from './DishMediaTab';
 import DialogueBox from '../../../components/DialogueBox';
+import EditDishModal from '../../../components/EditDishModal';
 
 // Create context for dish data
 export const DishContext = createContext();
@@ -25,12 +26,7 @@ const DishDetail = () => {
   const [dish, setDish] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
   const [activeTab, setActiveTab] = useState('variants');
-  const [isEditing, setIsEditing] = useState(false);
-  const [editForm, setEditForm] = useState({
-    dishName: '',
-    story: '',
-    description: ''
-  });
+  const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   
   // Dialogue box state
   const [dialogueBox, setDialogueBox] = useState({
@@ -73,16 +69,18 @@ const DishDetail = () => {
         kitchenId: 1,
         kitchenName: 'Spice Garden Kitchen',
         status: 'active',
+        category: 'main-course',
+        course: 'dinner',
+        tags: ['spicy', 'traditional', 'rice'],
+        cuisine: ['Indian', 'Pakistani'],
+        allowCustomization: true,
+        allowNegotiation: false,
+        isSoldOut: false,
         createdAt: '2024-01-15T10:30:00Z',
         updatedAt: '2024-01-20T14:45:00Z'
       };
       
       setDish(mockDish);
-      setEditForm({
-        dishName: mockDish.dishName,
-        story: mockDish.story,
-        description: mockDish.description
-      });
       setIsLoading(false);
     };
     
@@ -93,45 +91,26 @@ const DishDetail = () => {
     }
   }, [dishId, canViewDishDetail]);
 
-  // Handle edit form changes
-  const handleEditChange = (e) => {
-    const { name, value } = e.target;
-    setEditForm(prev => ({
-      ...prev,
-      [name]: value
-    }));
-  };
-
-  // Handle save edit
-  const handleSaveEdit = async () => {
+  // Handle save edit from modal
+  const handleSaveEdit = async (editedData) => {
     try {
       // TODO: Replace with RTK Query mutation
-      console.log('Saving dish edit:', editForm);
+      console.log('Saving dish edit:', editedData);
       
       // Update local state
       setDish(prev => ({
         ...prev,
-        ...editForm,
+        ...editedData,
         updatedAt: new Date().toISOString()
       }));
       
-      setIsEditing(false);
       showDialogue('success', 'Dish Updated', 'Dish information has been updated successfully.');
       
     } catch (error) {
       console.error('Failed to update dish:', error);
       showDialogue('error', 'Update Failed', `Failed to update dish: ${error.message || 'Unknown error occurred'}`);
+      throw error; // Re-throw to let modal handle it
     }
-  };
-
-  // Handle cancel edit
-  const handleCancelEdit = () => {
-    setEditForm({
-      dishName: dish.dishName,
-      story: dish.story,
-      description: dish.description
-    });
-    setIsEditing(false);
   };
 
   // Tab configuration
@@ -205,7 +184,7 @@ const DishDetail = () => {
             </div>
             {canEditDish && (
               <button
-                onClick={() => setIsEditing(true)}
+                onClick={() => setIsEditModalOpen(true)}
                 className="inline-flex items-center px-4 py-2 border border-transparent shadow-sm text-sm font-medium rounded-md text-white bg-primary-600 hover:bg-primary-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500"
               >
                 <PencilIcon className="h-4 w-4 mr-2" />
@@ -217,90 +196,98 @@ const DishDetail = () => {
 
         {/* Dish Information Card */}
         <div className="bg-white rounded-lg border border-neutral-200 p-6 mb-6">
-          {isEditing ? (
-            <div className="space-y-4">
+          <div>
+            <div className="flex justify-between items-start mb-4">
               <div>
-                <label className="block text-sm font-medium text-neutral-700 mb-1">
-                  Dish Name
-                </label>
-                <input
-                  type="text"
-                  name="dishName"
-                  value={editForm.dishName}
-                  onChange={handleEditChange}
-                  className="w-full p-3 border border-neutral-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
-                />
+                <h2 className="text-xl font-semibold text-neutral-900">{dish.dishName}</h2>
+                {dish.story && (
+                  <p className="text-sm text-neutral-600 mt-1">{dish.story}</p>
+                )}
               </div>
-              <div>
-                <label className="block text-sm font-medium text-neutral-700 mb-1">
-                  Story
-                </label>
-                <input
-                  type="text"
-                  name="story"
-                  value={editForm.story}
-                  onChange={handleEditChange}
-                  className="w-full p-3 border border-neutral-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-neutral-700 mb-1">
-                  Description
-                </label>
-                <textarea
-                  name="description"
-                  value={editForm.description}
-                  onChange={handleEditChange}
-                  rows={3}
-                  className="w-full p-3 border border-neutral-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
-                />
-              </div>
-              <div className="flex justify-end space-x-3">
-                <button
-                  onClick={handleCancelEdit}
-                  className="px-4 py-2 bg-white border border-neutral-300 text-neutral-700 rounded-full hover:bg-neutral-50 transition-colors text-sm font-medium"
-                >
-                  Cancel
-                </button>
-                <button
-                  onClick={handleSaveEdit}
-                  className="px-4 py-2 bg-primary-600 text-white rounded-full hover:bg-primary-700 transition-colors text-sm font-medium"
-                >
-                  Save Changes
-                </button>
-              </div>
-            </div>
-          ) : (
-            <div>
-              <div className="flex justify-between items-start mb-4">
-                <div>
-                  <h2 className="text-xl font-semibold text-neutral-900">{dish.dishName}</h2>
-                  {dish.story && (
-                    <p className="text-sm text-neutral-600 mt-1">{dish.story}</p>
-                  )}
-                </div>
+              <div className="flex items-center space-x-2">
+                {dish.isSoldOut && (
+                  <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-800">
+                    Sold Out
+                  </span>
+                )}
                 <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
                   {dish.status}
                 </span>
               </div>
-              
-              <div className="mb-4">
-                <h3 className="text-sm font-medium text-neutral-700 mb-2">Description</h3>
-                <p className="text-neutral-600">{dish.description}</p>
-              </div>
-              
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
+            </div>
+            
+            <div className="mb-4">
+              <h3 className="text-sm font-medium text-neutral-700 mb-2">Description</h3>
+              <p className="text-neutral-600">{dish.description}</p>
+            </div>
+            
+            {/* Additional dish details */}
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mb-4">
+              {dish.category && (
                 <div>
-                  <span className="font-medium text-neutral-700">Created:</span>
-                  <span className="ml-2 text-neutral-600">{formatDate(dish.createdAt)}</span>
+                  <span className="font-medium text-neutral-700">Category:</span>
+                  <span className="ml-2 text-neutral-600 capitalize">{dish.category.replace('-', ' ')}</span>
                 </div>
+              )}
+              {dish.course && (
                 <div>
-                  <span className="font-medium text-neutral-700">Last Updated:</span>
-                  <span className="ml-2 text-neutral-600">{formatDate(dish.updatedAt)}</span>
+                  <span className="font-medium text-neutral-700">Course:</span>
+                  <span className="ml-2 text-neutral-600 capitalize">{dish.course}</span>
                 </div>
+              )}
+              <div>
+                <span className="font-medium text-neutral-700">Customizable:</span>
+                <span className="ml-2 text-neutral-600">{dish.allowCustomization ? 'Yes' : 'No'}</span>
               </div>
             </div>
-          )}
+            
+            {/* Tags and Cuisine */}
+            {(dish.tags?.length > 0 || dish.cuisine?.length > 0) && (
+              <div className="mb-4 space-y-2">
+                {dish.tags?.length > 0 && (
+                  <div>
+                    <span className="text-sm font-medium text-neutral-700 mr-2">Tags:</span>
+                    <div className="inline-flex flex-wrap gap-1">
+                      {dish.tags.map((tag, index) => (
+                        <span
+                          key={index}
+                          className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-primary-100 text-primary-800"
+                        >
+                          {tag}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                )}
+                {dish.cuisine?.length > 0 && (
+                  <div>
+                    <span className="text-sm font-medium text-neutral-700 mr-2">Cuisine:</span>
+                    <div className="inline-flex flex-wrap gap-1">
+                      {dish.cuisine.map((cuisine, index) => (
+                        <span
+                          key={index}
+                          className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-green-100 text-green-800"
+                        >
+                          {cuisine}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+            
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
+              <div>
+                <span className="font-medium text-neutral-700">Created:</span>
+                <span className="ml-2 text-neutral-600">{formatDate(dish.createdAt)}</span>
+              </div>
+              <div>
+                <span className="font-medium text-neutral-700">Last Updated:</span>
+                <span className="ml-2 text-neutral-600">{formatDate(dish.updatedAt)}</span>
+              </div>
+            </div>
+          </div>
         </div>
 
         {/* Tabs */}
@@ -327,6 +314,14 @@ const DishDetail = () => {
             {ActiveTabComponent && <ActiveTabComponent />}
           </div>
         </div>
+
+        {/* Edit Dish Modal */}
+        <EditDishModal
+          isOpen={isEditModalOpen}
+          onClose={() => setIsEditModalOpen(false)}
+          dish={dish}
+          onSave={handleSaveEdit}
+        />
 
         {/* DialogueBox for feedback */}
         <DialogueBox
