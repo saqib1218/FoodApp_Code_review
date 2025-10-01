@@ -5,11 +5,21 @@ import DialogueBox from './DialogueBox';
 const AddDishModal = ({ isOpen, onClose, onSave, kitchenId, onDishAdded }) => {
   const [formData, setFormData] = useState({
     dishName: '',
+    category: '',
     story: '',
     description: ''
   });
   
   const [isLoading, setIsLoading] = useState(false);
+  
+  // Mock data for categories dropdown
+  const categories = [
+    { id: 'appetizer', name: 'Appetizer' },
+    { id: 'main-course', name: 'Main Course' },
+    { id: 'dessert', name: 'Dessert' },
+    { id: 'beverage', name: 'Beverage' },
+    { id: 'snack', name: 'Snack' }
+  ];
   
   // Dialogue box state for feedback
   const [dialogueBox, setDialogueBox] = useState({
@@ -67,6 +77,7 @@ const AddDishModal = ({ isOpen, onClose, onSave, kitchenId, onDishAdded }) => {
       const dishData = {
         id: Date.now(), // Mock ID for now
         name: formData.dishName,
+        category: formData.category,
         story: formData.story,
         description: formData.description,
         kitchenId,
@@ -90,6 +101,7 @@ const AddDishModal = ({ isOpen, onClose, onSave, kitchenId, onDishAdded }) => {
       // Reset form
       setFormData({
         dishName: '',
+        category: '',
         story: '',
         description: ''
       });
@@ -110,6 +122,7 @@ const AddDishModal = ({ isOpen, onClose, onSave, kitchenId, onDishAdded }) => {
   const handleClose = () => {
     setFormData({
       dishName: '',
+      category: '',
       story: '',
       description: ''
     });
@@ -152,6 +165,27 @@ const AddDishModal = ({ isOpen, onClose, onSave, kitchenId, onDishAdded }) => {
                   required
                   disabled={isLoading}
                 />
+              </div>
+
+              {/* Dish Category */}
+              <div>
+                <label className="block text-sm font-medium text-neutral-700 mb-1">
+                  Dish Category
+                </label>
+                <select
+                  name="category"
+                  value={formData.category}
+                  onChange={handleInputChange}
+                  className="w-full p-3 border border-neutral-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
+                  disabled={isLoading}
+                >
+                  <option value="">Select category</option>
+                  {categories.map(category => (
+                    <option key={category.id} value={category.id}>
+                      {category.name}
+                    </option>
+                  ))}
+                </select>
               </div>
 
               {/* Story */}
