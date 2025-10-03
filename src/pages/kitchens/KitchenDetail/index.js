@@ -330,16 +330,8 @@ const KitchenDetail = () => {
             </div>
             <div>
               <div className="mb-4">
-                <h3 className="text-sm font-medium text-neutral-500">Owner</h3>
-                <p className="mt-1 text-neutral-900">{kitchen.owner || 'N/A'}</p>
-              </div>
-              <div className="mb-4">
                 <h3 className="text-sm font-medium text-neutral-500">Status</h3>
                 <p className="mt-1">{getStatusBadge(kitchen.status)}</p>
-              </div>
-              <div className="mb-4">
-                <h3 className="text-sm font-medium text-neutral-500">Contact</h3>
-                <p className="mt-1 text-neutral-900">{kitchen.contact || 'N/A'}</p>
               </div>
               <div>
                 <h3 className="text-sm font-medium text-neutral-500">Logo Available</h3>

@@ -74,7 +74,7 @@ const PartenerDetail = () => {
     name: '',
     tagline: '',
     bio: '',
-    approvalStatus: 'Pending for approval'
+    approvalStatus: 'DRAFT'
   });
   const [kitchenNameError, setKitchenNameError] = useState('');
   const [kitchenInfo, setKitchenInfo] = useState(null);
@@ -119,7 +119,7 @@ const PartenerDetail = () => {
       setKitchenInfo({
         name: partener.kitchen.name || '',
         tagline: partener.kitchen.tagline || '',
-        approvalStatus: partener.kitchen.approvalStatus || 'Pending for approval',
+        approvalStatus: partener.kitchen.approvalStatus || 'DRAFT',
         createdDate: partener.kitchen.createdAt ? new Date(partener.kitchen.createdAt).toISOString().split('T')[0] : '',
         comment: ''
       });
@@ -186,7 +186,7 @@ const PartenerDetail = () => {
     });
     setShowKitchenModal(false);
     setShowConfirmationModal(false);
-    setKitchenForm({ name: '', tagline: '', approvalStatus: 'Pending for approval' });
+    setKitchenForm({ name: '', tagline: '', approvalStatus: 'DRAFT' });
     setKitchenNameError('');
     setConfirmationComment('');
   };
@@ -198,7 +198,7 @@ const PartenerDetail = () => {
 
   const handleCancelKitchen = () => {
     setShowKitchenModal(false);
-    setKitchenForm({ name: '', tagline: '', bio: '', approvalStatus: 'Pending for approval' });
+    setKitchenForm({ name: '', tagline: '', bio: '', approvalStatus: 'DRAFT' });
     setKitchenNameError('');
   };
   
@@ -936,7 +936,7 @@ const PartenerDetail = () => {
                   value={kitchenForm.approvalStatus}
                   className="w-full px-3 py-2 border border-gray-300 rounded-md bg-gray-100 text-gray-700 cursor-not-allowed"
                 >
-                  <option value="Pending for approval">Pending for approval</option>
+                  <option value="DRAFT">Draft</option>
                 </select>
               </div>
             </div>

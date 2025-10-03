@@ -21,14 +21,18 @@ const KitchensList = () => {
   const [filteredKitchens, setFilteredKitchens] = useState([]);
   const [currentPage, setCurrentPage] = useState(1);
   const [searchTerm, setSearchTerm] = useState('');
-  const [filters, setFilters] = useState({
+  const defaultFilters = {
     city: '',
     cuisine: '',
     status: '',
     phoneNumber: '',
-    kitchenId: '',
-    orderId: ''
-  });
+    kitchenName: '',
+    ownerName: '',
+    email: ''
+  };
+  const [filters, setFilters] = useState(defaultFilters);
+  // Pending filters only apply when user clicks Search
+  const [pendingFilters, setPendingFilters] = useState(defaultFilters);
   const [filterOptions, setFilterOptions] = useState({
     cities: [],
     cuisines: [],
@@ -82,13 +86,16 @@ const KitchensList = () => {
     }
   }, [kitchens]);
 
-  // Apply filters when search term or filters change
+  // Apply filters when search term or APPLIED filters change
   useEffect(() => {
     const applyFilters = () => {
       // Check if any filters are actually applied
-      const hasFilters = searchTerm.trim() !== '' || 
-                        filters.status !== '' || 
-                        filters.kitchenId !== '';
+      const hasFilters = searchTerm.trim() !== '' ||
+        filters.status !== '' ||
+        filters.kitchenName !== '' ||
+        filters.ownerName !== '' ||
+        filters.email !== '' ||
+        filters.phoneNumber !== '';
 
       // If no filters are applied, show all kitchens
       if (!hasFilters) {
@@ -113,11 +120,21 @@ const KitchensList = () => {
           filtered = filtered.filter(kitchen => kitchen.status === filters.status);
         }
 
-        // Apply kitchen ID filter
-        if (filters.kitchenId) {
-          filtered = filtered.filter(kitchen => 
-            kitchen.id.toString().includes(filters.kitchenId)
-          );
+        // Apply kitchen name filter (exact/contains)
+        if (filters.kitchenName) {
+          filtered = filtered.filter(k => k.name?.toLowerCase().includes(filters.kitchenName.toLowerCase()));
+        }
+        // Apply owner name filter
+        if (filters.ownerName) {
+          filtered = filtered.filter(k => (k.owner?.name || '').toLowerCase().includes(filters.ownerName.toLowerCase()));
+        }
+        // Apply email filter
+        if (filters.email) {
+          filtered = filtered.filter(k => (k.email || '').toLowerCase().includes(filters.email.toLowerCase()));
+        }
+        // Apply phone filter
+        if (filters.phoneNumber) {
+          filtered = filtered.filter(k => (k.phone || k.phoneNumber || '').toString().includes(filters.phoneNumber));
         }
 
         setFilteredKitchens(filtered);
@@ -209,6 +226,13 @@ const KitchensList = () => {
           }
           return 0;
         }
+        if (sortConfig.key === 'createdAt') {
+          const aDate = a.createdAt ? new Date(a.createdAt).getTime() : 0;
+          const bDate = b.createdAt ? new Date(b.createdAt).getTime() : 0;
+          if (aDate < bDate) return sortConfig.direction === 'asc' ? -1 : 1;
+          if (aDate > bDate) return sortConfig.direction === 'asc' ? 1 : -1;
+          return 0;
+        }
         return 0;
       });
     }
@@ -227,17 +251,14 @@ const KitchensList = () => {
     );
   };
 
-  // Reset all filters
+  // Apply and reset filters
+  const applyFiltersNow = () => {
+    setFilters(pendingFilters);
+  };
   const resetFilters = () => {
     setSearchTerm('');
-    setFilters({
-      city: '',
-      cuisine: '',
-      status: '',
-      phoneNumber: '',
-      kitchenId: '',
-      orderId: ''
-    });
+    setFilters(defaultFilters);
+    setPendingFilters(defaultFilters);
   };
 
   // Show unauthorized message if user doesn't have permission
@@ -317,8 +338,8 @@ const KitchensList = () => {
               </label>
               <select
                 className="block w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-1 focus:ring-primary-500 focus:border-primary-500"
-                value={filters.city}
-                onChange={(e) => setFilters({ ...filters, city: e.target.value })}
+                value={pendingFilters.city}
+                onChange={(e) => setPendingFilters({ ...pendingFilters, city: e.target.value })}
               >
                 <option value="">All Cities</option>
                 {filterOptions.cities.map((city) => (
@@ -334,8 +355,8 @@ const KitchensList = () => {
               </label>
               <select
                 className="block w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-1 focus:ring-primary-500 focus:border-primary-500"
-                value={filters.cuisine}
-                onChange={(e) => setFilters({ ...filters, cuisine: e.target.value })}
+                value={pendingFilters.cuisine}
+                onChange={(e) => setPendingFilters({ ...pendingFilters, cuisine: e.target.value })}
               >
                 <option value="">All Cuisines</option>
                 {filterOptions.cuisines.map((cuisine) => (
@@ -353,32 +374,44 @@ const KitchensList = () => {
                 type="text"
                 className="block w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-1 focus:ring-primary-500 focus:border-primary-500"
                 placeholder="Search phone..."
-                value={filters.phoneNumber}
-                onChange={(e) => setFilters({ ...filters, phoneNumber: e.target.value })}
+                value={pendingFilters.phoneNumber}
+                onChange={(e) => setPendingFilters({ ...pendingFilters, phoneNumber: e.target.value })}
               />
             </div>
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">
-                Kitchen ID
+                Kitchen Name
               </label>
               <input
                 type="text"
                 className="block w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-1 focus:ring-primary-500 focus:border-primary-500"
-                placeholder="Search kitchen ID..."
-                value={filters.kitchenId}
-                onChange={(e) => setFilters({ ...filters, kitchenId: e.target.value })}
+                placeholder="Search kitchen name..."
+                value={pendingFilters.kitchenName}
+                onChange={(e) => setPendingFilters({ ...pendingFilters, kitchenName: e.target.value })}
               />
             </div>
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">
-                Order ID
+                Owner Name
               </label>
               <input
                 type="text"
                 className="block w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-1 focus:ring-primary-500 focus:border-primary-500"
-                placeholder="Search order ID..."
-                value={filters.orderId}
-                onChange={(e) => setFilters({ ...filters, orderId: e.target.value })}
+                placeholder="Search owner name..."
+                value={pendingFilters.ownerName}
+                onChange={(e) => setPendingFilters({ ...pendingFilters, ownerName: e.target.value })}
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Email
+              </label>
+              <input
+                type="text"
+                className="block w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-1 focus:ring-primary-500 focus:border-primary-500"
+                placeholder="Search email..."
+                value={pendingFilters.email}
+                onChange={(e) => setPendingFilters({ ...pendingFilters, email: e.target.value })}
               />
             </div>
             <div>
@@ -387,8 +420,8 @@ const KitchensList = () => {
               </label>
               <select
                 className="block w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-1 focus:ring-primary-500 focus:border-primary-500"
-                value={filters.status}
-                onChange={(e) => setFilters({ ...filters, status: e.target.value })}
+                value={pendingFilters.status}
+                onChange={(e) => setPendingFilters({ ...pendingFilters, status: e.target.value })}
               >
                 <option value="">All Status</option>
                 {filterOptions.statuses.map((status) => (
@@ -398,6 +431,20 @@ const KitchensList = () => {
                 ))}
               </select>
             </div>
+          </div>
+          <div className="mt-4 flex items-center gap-3">
+            <button
+              onClick={applyFiltersNow}
+              className="px-4 py-2 bg-primary-600 text-white rounded-md hover:bg-primary-700 transition-colors text-sm"
+            >
+              Search
+            </button>
+            <button
+              onClick={resetFilters}
+              className="px-4 py-2 bg-white border border-neutral-300 text-neutral-700 rounded-md hover:bg-neutral-50 transition-colors text-sm"
+            >
+              Reset Filters
+            </button>
           </div>
         </div>
       )}
@@ -434,8 +481,16 @@ const KitchensList = () => {
                       {getSortIcon('name')}
                     </div>
                   </th>
-                  <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-neutral-500 uppercase tracking-wider">
-                    Owner
+                  <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-neutral-500 uppercase tracking-wider">Owner</th>
+                  <th 
+                    scope="col"
+                    className="px-6 py-3 text-left text-xs font-medium text-neutral-500 uppercase tracking-wider cursor-pointer hover:bg-neutral-100 transition-colors"
+                    onClick={() => handleSort('createdAt')}
+                  >
+                    <div className="flex items-center">
+                      Created At
+                      {getSortIcon('createdAt')}
+                    </div>
                   </th>
                   <th 
                     scope="col" 
@@ -460,6 +515,9 @@ const KitchensList = () => {
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
                       <div className="text-sm text-neutral-700">{kitchen.owner?.name || 'No Owner'}</div>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <div className="text-sm text-neutral-700">{kitchen.createdAt ? new Date(kitchen.createdAt).toLocaleDateString() : 'N/A'}</div>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
                       {getStatusBadge(kitchen.status)}
