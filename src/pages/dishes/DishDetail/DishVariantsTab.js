@@ -5,6 +5,7 @@ import { PERMISSIONS } from '../../../contexts/PermissionRegistry';
 import { DishContext } from './index';
 import ConfirmationModal from '../../../components/ConfirmationModal';
 import DialogueBox from '../../../components/DialogueBox';
+import dishDropdownData from '../../../data/dishDropdown/dishDropdownData.json';
 
 const DishVariantsTab = () => {
   const { id: dishId } = useContext(DishContext);
@@ -29,7 +30,10 @@ const DishVariantsTab = () => {
     description: '',
     unit: '',
     quantity: '',
+    minQuantity: '',
+    maxQuantity: '',
     price: '',
+    currency: 'PKR',
     perLimit: '',
     dailyLimit: '',
     status: 'active'
@@ -120,7 +124,10 @@ const DishVariantsTab = () => {
       description: '',
       unit: '',
       quantity: '',
+      minQuantity: '',
+      maxQuantity: '',
       price: '',
+      currency: 'PKR',
       perLimit: '',
       dailyLimit: '',
       status: 'active'
@@ -290,12 +297,14 @@ const DishVariantsTab = () => {
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
                         <div className="text-sm text-neutral-900">
-                          {variant.quantity} {variant.unit}
+                          {variant.unit === 'serving'
+                            ? `${variant.minQuantity || '-'} - ${variant.maxQuantity || '-'} serving`
+                            : `${variant.quantity} ${variant.unit}`}
                         </div>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
                         <div className="text-sm font-medium text-neutral-900">
-                          ₹{variant.price}
+                          PKR {variant.price}
                         </div>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
@@ -378,46 +387,93 @@ const DishVariantsTab = () => {
                     placeholder="Describe this variant"
                   />
                 </div>
-                <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-4">
                   <div>
                     <label className="block text-sm font-medium text-neutral-700 mb-1">
                       Unit
                     </label>
-                    <input
-                      type="text"
+                    <select
                       name="unit"
                       value={variantForm.unit}
                       onChange={handleFormChange}
                       className="w-full p-3 border border-neutral-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
-                      placeholder="e.g., plate, pack"
-                    />
+                    >
+                      <option value="">Select unit</option>
+                      {dishDropdownData.dishUnits?.map(u => (
+                        <option key={u.id} value={u.name}>{u.name}</option>
+                      ))}
+                    </select>
                   </div>
-                  <div>
-                    <label className="block text-sm font-medium text-neutral-700 mb-1">
-                      Quantity
-                    </label>
-                    <input
-                      type="text"
-                      name="quantity"
-                      value={variantForm.quantity}
-                      onChange={handleFormChange}
-                      className="w-full p-3 border border-neutral-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
-                      placeholder="e.g., 1, 2"
-                    />
-                  </div>
+                  {variantForm.unit === 'serving' ? (
+                    <div className="grid grid-cols-2 gap-4">
+                      <div>
+                        <label className="block text-sm font-medium text-neutral-700 mb-1">
+                          Min Quantity
+                        </label>
+                        <input
+                          type="number"
+                          name="minQuantity"
+                          value={variantForm.minQuantity}
+                          onChange={handleFormChange}
+                          className="w-full p-3 border border-neutral-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
+                          placeholder="e.g., 1"
+                          min="0"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium text-neutral-700 mb-1">
+                          Max Quantity
+                        </label>
+                        <input
+                          type="number"
+                          name="maxQuantity"
+                          value={variantForm.maxQuantity}
+                          onChange={handleFormChange}
+                          className="w-full p-3 border border-neutral-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
+                          placeholder="e.g., 10"
+                          min="0"
+                        />
+                      </div>
+                    </div>
+                  ) : (
+                    <div>
+                      <label className="block text-sm font-medium text-neutral-700 mb-1">
+                        Quantity
+                      </label>
+                      <input
+                        type="text"
+                        name="quantity"
+                        value={variantForm.quantity}
+                        onChange={handleFormChange}
+                        className="w-full p-3 border border-neutral-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
+                        placeholder="e.g., 1, 2"
+                      />
+                    </div>
+                  )}
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-neutral-700 mb-1">
-                    Price (₹) *
+                    Price *
                   </label>
-                  <input
-                    type="number"
-                    name="price"
-                    value={variantForm.price}
-                    onChange={handleFormChange}
-                    className="w-full p-3 border border-neutral-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
-                    placeholder="Enter price"
-                  />
+                  <div className="grid grid-cols-5 gap-2">
+                    <input
+                      type="number"
+                      name="price"
+                      value={variantForm.price}
+                      onChange={handleFormChange}
+                      className="col-span-4 p-3 border border-neutral-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
+                      placeholder="Enter price"
+                      min="0"
+                    />
+                    <select
+                      name="currency"
+                      value={variantForm.currency}
+                      disabled
+                      className="col-span-1 p-3 border border-neutral-300 rounded-lg bg-neutral-100 text-neutral-700"
+                    >
+                      <option value="PKR">PKR</option>
+                    </select>
+                  </div>
                 </div>
                 <div className="grid grid-cols-2 gap-4">
                   <div>
@@ -491,11 +547,15 @@ const DishVariantsTab = () => {
               </div>
               <div>
                 <span className="text-sm font-medium text-neutral-700">Unit/Quantity:</span>
-                <span className="ml-2 text-sm text-neutral-900">{selectedVariant.quantity} {selectedVariant.unit}</span>
+                <span className="ml-2 text-sm text-neutral-900">
+                  {selectedVariant.unit === 'serving'
+                    ? `${selectedVariant.minQuantity || '-'} - ${selectedVariant.maxQuantity || '-'} serving`
+                    : `${selectedVariant.quantity} ${selectedVariant.unit}`}
+                </span>
               </div>
               <div>
                 <span className="text-sm font-medium text-neutral-700">Price:</span>
-                <span className="ml-2 text-sm font-medium text-neutral-900">₹{selectedVariant.price}</span>
+                <span className="ml-2 text-sm font-medium text-neutral-900">PKR {selectedVariant.price}</span>
               </div>
               <div>
                 <span className="text-sm font-medium text-neutral-700">Per Order Limit:</span>

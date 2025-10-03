@@ -33,10 +33,9 @@ const KitchenMediaTab = () => {
   const [kitchenMedia, setKitchenMedia] = useState([]);
   const [uploadProgress, setUploadProgress] = useState(0);
   const [isUploading, setIsUploading] = useState(false);
-  const [selectedImage, setSelectedImage] = useState(null);
+  // Removed image preview modal; open in new tab instead
   const [selectedMedia, setSelectedMedia] = useState(null);
   const [showAddMediaModal, setShowAddMediaModal] = useState(false);
-  const [showImagePreviewModal, setShowImagePreviewModal] = useState(false);
   const [showConfirmModal, setShowConfirmModal] = useState(false);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [showUpdateConfirmModal, setShowUpdateConfirmModal] = useState(false);
@@ -45,6 +44,7 @@ const KitchenMediaTab = () => {
   const [newMediaUsedAs, setNewMediaUsedAs] = useState('banner');
   const [newMediaCaption, setNewMediaCaption] = useState('');
   const [newMediaPreview, setNewMediaPreview] = useState('');
+  const [newMediaStatus, setNewMediaStatus] = useState('active');
   const [confirmComment, setConfirmComment] = useState('');
   const [deleteComment, setDeleteComment] = useState('');
   const [updateComment, setUpdateComment] = useState('');
@@ -83,10 +83,10 @@ const KitchenMediaTab = () => {
     }
   }, [kitchenMediaData]);
 
-  // Handle image preview
-  const handleImagePreview = (image) => {
-    setSelectedImage(image);
-    setShowImagePreviewModal(true);
+  // Open media in new tab
+  const openMediaInNewTab = (media) => {
+    const url = media.processedUrl || media.url;
+    if (url) window.open(url, '_blank', 'noopener,noreferrer');
   };
 
   // Handle media file change
@@ -104,11 +104,13 @@ const KitchenMediaTab = () => {
 
   // Handle add media
   const handleAddMedia = () => {
+    setSelectedMedia(null);
     setNewMediaFile(null);
     setNewMediaPreview('');
     setNewMediaType('image');
     setNewMediaUsedAs('banner');
     setNewMediaCaption('');
+    setNewMediaStatus('active');
     setShowAddMediaModal(true);
   };
 
@@ -212,10 +214,11 @@ const KitchenMediaTab = () => {
   const handleEditMedia = (media) => {
     // Set the media to edit
     setSelectedMedia(media);
-    setNewMediaType(media.type);
-    setNewMediaUsedAs(media.mediaUsedAs || 'banner');
+    setNewMediaType(media.mediaType || 'image');
+    setNewMediaUsedAs(media.categoryType || 'banner');
     setNewMediaCaption(media.caption || '');
-    setNewMediaPreview(media.url);
+    setNewMediaStatus((media.status || 'active').toLowerCase() === 'inactive' ? 'inactive' : 'active');
+    setNewMediaPreview('');
     setShowAddMediaModal(true);
   };
 
@@ -250,26 +253,17 @@ const KitchenMediaTab = () => {
   // Handle confirm update media
   const handleConfirmUpdateMedia = async () => {
     try {
-      // If there's a new file, we need to upload it first
-      if (newMediaFile) {
-        // Follow the same S3 upload flow for updates
-        await confirmAddMedia();
-      } else {
-        // Since we removed the confirmation API, we can't update just metadata
-        // User needs to re-upload the file to update caption
-        showDialogue('error', 'Update Not Available', 'To update media caption, please upload a new file.');
-        
-        // Reset form
-        resetMediaForm();
-        setShowUpdateConfirmModal(false);
-        setShowAddMediaModal(false);
-        return;
-      }
+      // For now, perform a local optimistic update for caption and status only
+      if (!selectedMedia) return;
+      const updatedList = kitchenMedia.map(m =>
+        m.id === selectedMedia.id ? { ...m, caption: newMediaCaption, status: newMediaStatus } : m
+      );
+      setKitchenMedia(updatedList);
+      showDialogue('success', 'Media Updated', 'Caption and status have been updated.');
     } catch (error) {
       console.error('Failed to update media:', error);
       showDialogue('error', 'Update Failed', `Update failed: ${error.message || 'Unknown error occurred'}`);
     } finally {
-      // Close all modals and reset state
       setShowUpdateConfirmModal(false);
       setShowAddMediaModal(false);
       resetMediaForm();
@@ -457,7 +451,7 @@ const KitchenMediaTab = () => {
                       <td className="px-6 py-4 whitespace-nowrap">
                         <div 
                           className="h-12 w-16 bg-neutral-100 rounded cursor-pointer"
-                          onClick={() => handleImagePreview(media)}
+                          onClick={() => openMediaInNewTab(media)}
                         >
                           <img
                             src={media.processedUrl || media.url}
@@ -498,7 +492,7 @@ const KitchenMediaTab = () => {
                             <PencilIcon className="h-4 w-4" />
                           </button>
                           <button
-                            onClick={() => handleImagePreview(media)}
+                            onClick={() => openMediaInNewTab(media)}
                             className="text-green-600 hover:text-green-900 transition-colors"
                             title="View media"
                           >
@@ -522,7 +516,7 @@ const KitchenMediaTab = () => {
         </div>
       )}
 
-      {/* Add Media Modal */}
+      {/* Add/Edit Media Modal */}
       {showAddMediaModal && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-xl shadow-lg max-w-md w-full max-h-[90vh] flex flex-col">
@@ -539,75 +533,83 @@ const KitchenMediaTab = () => {
             </div>
             <div className="flex-1 overflow-y-auto px-6">
               <div className="space-y-4">
-                <div>
-                  <label className="block text-sm font-medium text-neutral-700 mb-1">
-                    Media Type
-                  </label>
-                  <select
-                    value={newMediaType}
-                    onChange={(e) => handleMediaTypeChange(e.target.value)}
-                    className="w-full p-2 border border-neutral-300 rounded-lg"
-                  >
-                    <option value="image">Image</option>
-                    <option value="video">Video</option>
-                    <option value="audio">Audio</option>
-                  </select>
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-neutral-700 mb-1">
-                    Media Used As
-                  </label>
-                  <select
-                    value={newMediaUsedAs}
-                    onChange={(e) => setNewMediaUsedAs(e.target.value)}
-                    className="w-full p-2 border border-neutral-300 rounded-lg"
-                    disabled={newMediaType === 'video' || newMediaType === 'audio'}
-                  >
-                    {newMediaType === 'image' ? (
-                      <>
-                        <option value="banner">Banner</option>
-                        <option value="logo">Logo</option>
-                        <option value="standard">Standard</option>
-                      </>
-                    ) : (
-                      <option value="standard">Standard</option>
-                    )}
-                  </select>
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-neutral-700 mb-1">
-                    Media File
-                  </label>
-                  <input
-                    type="file"
-                    accept={newMediaType === 'image' ? 'image/*' : newMediaType === 'video' ? 'video/*' : 'audio/*'}
-                    onChange={handleMediaFileChange}
-                    className="w-full p-2 border border-neutral-300 rounded-lg"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-neutral-700 mb-1">
-                    Caption (Optional)
-                  </label>
-                  <input
-                    type="text"
-                    value={newMediaCaption}
-                    onChange={(e) => setNewMediaCaption(e.target.value)}
-                    className="w-full p-2 border border-neutral-300 rounded-lg"
-                    placeholder="Enter a caption for this media"
-                  />
-                </div>
-                {newMediaPreview && (
-                  <div>
-                    <h4 className="text-sm font-medium text-neutral-700 mb-2">Preview:</h4>
-                    <div className="rounded-lg overflow-hidden bg-neutral-100">
-                      <img
-                        src={newMediaPreview}
-                        alt="Media Preview"
-                        className="max-h-48 mx-auto"
+                {selectedMedia ? (
+                  <>
+                    <div>
+                      <label className="block text-sm font-medium text-neutral-700 mb-1">Caption</label>
+                      <input
+                        type="text"
+                        value={newMediaCaption}
+                        onChange={(e) => setNewMediaCaption(e.target.value)}
+                        className="w-full p-2 border border-neutral-300 rounded-lg"
+                        placeholder="Enter a caption"
                       />
                     </div>
-                  </div>
+                    <div>
+                      <label className="block text-sm font-medium text-neutral-700 mb-1">Status</label>
+                      <select
+                        value={newMediaStatus}
+                        onChange={(e) => setNewMediaStatus(e.target.value)}
+                        className="w-full p-2 border border-neutral-300 rounded-lg"
+                      >
+                        <option value="active">Active</option>
+                        <option value="inactive">Inactive</option>
+                      </select>
+                    </div>
+                  </>
+                ) : (
+                  <>
+                    <div>
+                      <label className="block text-sm font-medium text-neutral-700 mb-1">Media Type</label>
+                      <select
+                        value={newMediaType}
+                        onChange={(e) => handleMediaTypeChange(e.target.value)}
+                        className="w-full p-2 border border-neutral-300 rounded-lg"
+                      >
+                        <option value="image">Image</option>
+                        <option value="video">Video</option>
+                        <option value="audio">Audio</option>
+                      </select>
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-neutral-700 mb-1">Media Used As</label>
+                      <select
+                        value={newMediaUsedAs}
+                        onChange={(e) => setNewMediaUsedAs(e.target.value)}
+                        className="w-full p-2 border border-neutral-300 rounded-lg"
+                        disabled={newMediaType === 'video' || newMediaType === 'audio'}
+                      >
+                        {newMediaType === 'image' ? (
+                          <>
+                            <option value="banner">Banner</option>
+                            <option value="logo">Logo</option>
+                            <option value="standard">Standard</option>
+                          </>
+                        ) : (
+                          <option value="standard">Standard</option>
+                        )}
+                      </select>
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-neutral-700 mb-1">Media File</label>
+                      <input
+                        type="file"
+                        accept={newMediaType === 'image' ? 'image/*' : newMediaType === 'video' ? 'video/*' : 'audio/*'}
+                        onChange={handleMediaFileChange}
+                        className="w-full p-2 border border-neutral-300 rounded-lg"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-neutral-700 mb-1">Caption (Optional)</label>
+                      <input
+                        type="text"
+                        value={newMediaCaption}
+                        onChange={(e) => setNewMediaCaption(e.target.value)}
+                        className="w-full p-2 border border-neutral-300 rounded-lg"
+                        placeholder="Enter a caption for this media"
+                      />
+                    </div>
+                  </>
                 )}
               </div>
             </div>
@@ -622,47 +624,8 @@ const KitchenMediaTab = () => {
                 onClick={() => selectedMedia ? setShowUpdateConfirmModal(true) : handleSubmitAddMedia()}
                 className="px-4 py-2 bg-primary-600 text-white rounded-full hover:bg-primary-700 transition-colors text-sm font-medium"
               >
-                {selectedMedia ? 'Update Media' : 'Add Media'}
+                {selectedMedia ? 'Save Changes' : 'Add Media'}
               </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Image Preview Modal */}
-      {showImagePreviewModal && selectedImage && (
-        <div className="fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center z-50 p-4">
-          <div className="w-[20vw] max-h-[90vh] flex flex-col">
-            <div className="flex justify-end mb-2">
-              <button
-                onClick={() => setShowImagePreviewModal(false)}
-                className="text-white hover:text-neutral-300 bg-black bg-opacity-50 rounded-full p-2"
-              >
-                <XMarkIcon className="h-6 w-6" />
-              </button>
-            </div>
-            <div className="bg-white rounded-xl overflow-hidden flex-1 flex flex-col">
-              <div className="flex-1 flex items-center justify-center bg-neutral-50 p-4" style={{ minHeight: '60vh', maxHeight: '70vh' }}>
-                <img
-                  src={selectedImage.url}
-                  alt={selectedImage.type}
-                  className="max-w-full max-h-full object-contain"
-                  
-                />
-              </div>
-              <div className="p-4 bg-white">
-                <div className="flex justify-between items-center">
-                  <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-neutral-100 text-neutral-800">
-                    {getMediaUsedDisplay(selectedImage.mediaUsedAs || 'banner')}
-                  </span>
-                  <span className="text-sm text-neutral-500">
-                    Status: {selectedImage.status || 'Active'}
-                  </span>
-                </div>
-                {selectedImage.caption && (
-                  <p className="mt-2 text-neutral-700">{selectedImage.caption}</p>
-                )}
-              </div>
             </div>
           </div>
         </div>

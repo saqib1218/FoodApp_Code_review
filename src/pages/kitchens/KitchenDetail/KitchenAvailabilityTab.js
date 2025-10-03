@@ -1,4 +1,5 @@
 import React, { useState, useContext } from 'react';
+import { useParams } from 'react-router-dom';
 import { XMarkIcon, PencilIcon, CheckCircleIcon } from '@heroicons/react/24/outline';
 import { useGetKitchenAvailabilityQuery, useUpdateKitchenAvailabilityMutation } from '../../../store/api/modules/kitchens/kitchensApi';
 import { useAuth } from '../../../hooks/useAuth';
@@ -9,7 +10,8 @@ import DialogueBox from '../../../components/DialogueBox';
 
 const KitchenAvailabilityTab = () => {
   const { kitchen } = useContext(KitchenContext);
-  const kitchenId = kitchen?.id;
+  const { id: routeKitchenId } = useParams();
+  const kitchenId = routeKitchenId || kitchen?.id;
   const { hasPermission } = useAuth();
   
   // Check permission for viewing kitchen availability

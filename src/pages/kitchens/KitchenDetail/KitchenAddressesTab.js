@@ -1,4 +1,5 @@
 import React, { useState, useContext } from 'react';
+import { useParams } from 'react-router-dom';
 import { PencilIcon, XMarkIcon, PlusIcon, EyeIcon, TrashIcon } from '@heroicons/react/24/outline';
 import { useGetKitchenAddressesQuery, useAddKitchenAddressMutation, useUpdateKitchenAddressMutation } from '../../../store/api/modules/kitchens/kitchensApi';
 import { useAuth } from '../../../hooks/useAuth';
@@ -6,11 +7,13 @@ import { PERMISSIONS } from '../../../contexts/PermissionRegistry';
 import { KitchenContext } from './index';
 import ConfirmationModal from '../../../components/ConfirmationModal';
 import DialogueBox from '../../../components/DialogueBox';
+import addressData from '../../../data/AddressData/addressData.json';
 
 const KitchenAddressesTab = () => {
   const { hasPermission } = useAuth();
   const { kitchen } = useContext(KitchenContext);
-  const kitchenId = kitchen?.id;
+  const { id: routeKitchenId } = useParams();
+  const kitchenId = routeKitchenId || kitchen?.id;
   
   // Check permission for viewing kitchen addresses
   const canViewKitchenAddresses = hasPermission(PERMISSIONS.KITCHEN_ADDRESS_LIST_VIEW);
@@ -71,6 +74,13 @@ const KitchenAddressesTab = () => {
     });
   };
 
+  // Open the entered location link in a new tab for verification
+  const handleVerifyLocation = () => {
+    if (addressForm.locationLink) {
+      window.open(addressForm.locationLink, '_blank', 'noopener,noreferrer');
+    }
+  };
+
   const closeDialogue = () => {
     setDialogueBox({
       isOpen: false,
@@ -86,12 +96,13 @@ const KitchenAddressesTab = () => {
     setShowModal(true);
     setAddressForm({
       fullAddress: '',
-      city: '',
+      city: 'Karachi',
       cityZone: '',
       nearestLocation: '',
       locationLink: '',
       longitude: '',
       latitude: '',
+      country: 'Pakistan',
       status: 'active'
     });
     setShowAddressModal(true);
@@ -102,13 +113,13 @@ const KitchenAddressesTab = () => {
     setSelectedAddress(address);
     setAddressForm({
       fullAddress: address.addressLine1 || '',
-      city: address.city || '',
+      city: address.city || 'Karachi',
       cityZone: address.zone || '',
       nearestLocation: address.nearestLocation || '',
       locationLink: address.mapLink || '',
       longitude: address.longitude || '',
       latitude: address.latitude || '',
-      country: address.country || '',
+      country: address.country || 'Pakistan',
       status: address.status || 'active'
     });
     setShowAddressModal(true);
@@ -148,7 +159,12 @@ const KitchenAddressesTab = () => {
       const apiPayload = {
         addressLine1: addressForm.fullAddress,
         city: addressForm.city,
-        country: addressForm.country
+        country: addressForm.country,
+        zone: addressForm.cityZone || '',
+        mapLink: addressForm.locationLink || '',
+        nearestLocation: addressForm.nearestLocation || '',
+        latitude: addressForm.latitude || '',
+        longitude: addressForm.longitude || ''
       };
       
       // Call API to update address
@@ -233,7 +249,12 @@ const KitchenAddressesTab = () => {
         const apiPayload = {
           addressLine1: addressForm.fullAddress,
           city: addressForm.city,
-          country: addressForm.country
+          country: addressForm.country,
+          zone: addressForm.cityZone || '',
+          mapLink: addressForm.locationLink || '',
+          nearestLocation: addressForm.nearestLocation || '',
+          latitude: addressForm.latitude || '',
+          longitude: addressForm.longitude || ''
         };
         
         // Call API to add address
@@ -464,47 +485,56 @@ const KitchenAddressesTab = () => {
                 <label htmlFor="city" className="block text-sm font-medium text-neutral-700 mb-1">
                   City
                 </label>
-                <input
-                  type="text"
+                <select
                   id="city"
                   name="city"
                   value={addressForm.city}
-                  onChange={(e) => setAddressForm({...addressForm, city: e.target.value})}
-                  className="w-full p-3 border border-neutral-300 rounded-xl focus:ring-primary-500 focus:border-primary-500"
-                  placeholder="Enter city name"
+                  onChange={(e) => setAddressForm({ ...addressForm, city: e.target.value, cityZone: '' })}
+                  className="w-full p-3 border border-neutral-300 rounded-xl focus:ring-primary-500 focus:border-primary-500 bg-neutral-100 text-neutral-700"
+                  disabled
                   required
-                />
+                >
+                  {addressData.cities.filter(c => c.countryId === 'PK').map(c => (
+                    <option key={c.id} value={c.name}>{c.name}</option>
+                  ))}
+                </select>
               </div>
               
               <div>
                 <label htmlFor="country" className="block text-sm font-medium text-neutral-700 mb-1">
                   Country
                 </label>
-                <input
-                  type="text"
+                <select
                   id="country"
                   name="country"
                   value={addressForm.country}
-                  onChange={(e) => setAddressForm({...addressForm, country: e.target.value})}
-                  className="w-full p-3 border border-neutral-300 rounded-xl focus:ring-primary-500 focus:border-primary-500"
-                  placeholder="Enter country name"
+                  onChange={(e) => setAddressForm({ ...addressForm, country: e.target.value })}
+                  className="w-full p-3 border border-neutral-300 rounded-xl focus:ring-primary-500 focus:border-primary-500 bg-neutral-100 text-neutral-700"
+                  disabled
                   required
-                />
+                >
+                  {addressData.countries.map(c => (
+                    <option key={c.id} value={c.name}>{c.name}</option>
+                  ))}
+                </select>
               </div>
               
               <div>
                 <label htmlFor="cityZone" className="block text-sm font-medium text-neutral-700 mb-1">
                   City Zone
                 </label>
-                <input
-                  type="text"
+                <select
                   id="cityZone"
                   name="cityZone"
                   value={addressForm.cityZone}
-                  onChange={(e) => setAddressForm({...addressForm, cityZone: e.target.value})}
+                  onChange={(e) => setAddressForm({ ...addressForm, cityZone: e.target.value })}
                   className="w-full p-3 border border-neutral-300 rounded-xl focus:ring-primary-500 focus:border-primary-500"
-                  placeholder="Enter city zone"
-                />
+                >
+                  <option value="">Select zone</option>
+                  {(addressData.cityZones['KHI'] || []).map(z => (
+                    <option key={z.id} value={z.name}>{z.name}</option>
+                  ))}
+                </select>
               </div>
               
               <div>
@@ -578,6 +608,17 @@ const KitchenAddressesTab = () => {
                   />
                 </div>
               </div>
+              {(addressForm.longitude && addressForm.latitude && addressForm.locationLink) && (
+                <div className="mt-2">
+                  <button
+                    type="button"
+                    onClick={handleVerifyLocation}
+                    className="px-3 py-2 bg-primary-600 text-white rounded-full hover:bg-primary-700 transition-colors text-xs font-medium"
+                  >
+                    Verify Location
+                  </button>
+                </div>
+              )}
               
               <div>
                 <label htmlFor="status" className="block text-sm font-medium text-neutral-700 mb-1">

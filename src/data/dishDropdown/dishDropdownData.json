@@ -55,5 +55,12 @@
     { "id": 7, "name": "High Protein" },
     { "id": 8, "name": "Dairy Free" },
     { "id": 9, "name": "Nut Free" }
+  ],
+  "dishUnits": [
+    { "id": 1, "name": "plate" },
+    { "id": 2, "name": "kilogram" },
+    { "id": 3, "name": "liter" },
+    { "id": 4, "name": "serving" },
+    { "id": 5, "name": "gram" }
   ]
 }

@@ -1202,7 +1202,7 @@ const UserManagementList = () => {
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6 h-[300px]">
               {/* Available Permissions */}
               <div className="flex flex-col">
-                <h4 className="text-sm font-medium text-gray-700 mb-3">Available Permissions</h4>
+                <h4 className="text-sm font-medium text-gray-700 mb-3">Available Permissionff</h4>
                 <div
                   className="border-2 border-dashed border-gray-300 rounded-lg p-4 bg-gray-50 h-[300px] overflow-y-auto"
                   onDragOver={handleDragOver}

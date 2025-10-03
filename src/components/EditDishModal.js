@@ -9,10 +9,6 @@ const EditDishModal = ({ isOpen, onClose, dish, onSave }) => {
     story: '',
     description: '',
     category: '',
-    course: '',
-    tags: [],
-    cuisine: [],
-    dietaryFlags: [],
     allowCustomization: false,
     allowNegotiation: false,
     isSoldOut: false
@@ -29,7 +25,7 @@ const EditDishModal = ({ isOpen, onClose, dish, onSave }) => {
   });
 
   // Get dropdown data from JSON file
-  const { dishCategories, dishCourseTypes, dishTags, dishCuisines, dishDietaryFlags } = dishDropdownData;
+  const { dishCategories } = dishDropdownData;
 
   // Initialize form data when dish changes
   useEffect(() => {
@@ -39,10 +35,6 @@ const EditDishModal = ({ isOpen, onClose, dish, onSave }) => {
         story: dish.story || '',
         description: dish.description || '',
         category: dish.category || '',
-        course: dish.course || '',
-        tags: dish.tags || [],
-        cuisine: dish.cuisine || [],
-        dietaryFlags: dish.dietaryFlags || [],
         allowCustomization: dish.allowCustomization || false,
         allowNegotiation: dish.allowNegotiation || false,
         isSoldOut: dish.isSoldOut || false
@@ -74,36 +66,6 @@ const EditDishModal = ({ isOpen, onClose, dish, onSave }) => {
     setFormData(prev => ({
       ...prev,
       [name]: type === 'checkbox' ? checked : value
-    }));
-  };
-
-  const handleMultiSelectChange = (fieldName, value) => {
-    setFormData(prev => {
-      const currentValues = prev[fieldName] || [];
-      const isSelected = currentValues.includes(value);
-      
-      return {
-        ...prev,
-        [fieldName]: isSelected 
-          ? currentValues.filter(item => item !== value)
-          : [...currentValues, value]
-      };
-    });
-  };
-
-  const handleDropdownSelect = (fieldName, value) => {
-    if (value && !formData[fieldName].includes(value)) {
-      setFormData(prev => ({
-        ...prev,
-        [fieldName]: [...prev[fieldName], value]
-      }));
-    }
-  };
-
-  const handleRemoveItem = (fieldName, valueToRemove) => {
-    setFormData(prev => ({
-      ...prev,
-      [fieldName]: prev[fieldName].filter(item => item !== valueToRemove)
     }));
   };
 
@@ -220,168 +182,24 @@ const EditDishModal = ({ isOpen, onClose, dish, onSave }) => {
                 />
               </div>
 
-              {/* Category and Course - Side by side */}
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-sm font-medium text-neutral-700 mb-1">
-                    Dish Category
-                  </label>
-                  <select
-                    name="category"
-                    value={formData.category}
-                    onChange={handleInputChange}
-                    className="w-full p-3 border border-neutral-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
-                  >
-                    <option value="">Select category</option>
-                    {dishCategories.map(category => (
-                      <option key={category.id} value={category.name}>
-                        {category.name}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-neutral-700 mb-1">
-                    Dish Course
-                  </label>
-                  <select
-                    name="course"
-                    value={formData.course}
-                    onChange={handleInputChange}
-                    className="w-full p-3 border border-neutral-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
-                  >
-                    <option value="">Select course</option>
-                    {dishCourseTypes.map(course => (
-                      <option key={course.id} value={course.name}>
-                        {course.name}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-              </div>
-
-              {/* Dish Tags */}
+              {/* Dish Category */}
               <div>
                 <label className="block text-sm font-medium text-neutral-700 mb-1">
-                  Dish Tags
+                  Dish Category
                 </label>
                 <select
-                  value=""
-                  onChange={(e) => {
-                    handleDropdownSelect('tags', e.target.value);
-                    e.target.value = ''; // Reset dropdown
-                  }}
+                  name="category"
+                  value={formData.category}
+                  onChange={handleInputChange}
                   className="w-full p-3 border border-neutral-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
                 >
-                  <option value="">Select tags</option>
-                  {dishTags.map(tag => (
-                    <option key={tag.id} value={tag.name}>
-                      {tag.name}
+                  <option value="">Select category</option>
+                  {dishCategories.map(category => (
+                    <option key={category.id} value={category.name}>
+                      {category.name}
                     </option>
                   ))}
                 </select>
-                {formData.tags.length > 0 && (
-                  <div className="flex flex-wrap gap-2 mt-2">
-                    {formData.tags.map((tag, index) => (
-                      <span
-                        key={index}
-                        className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-primary-100 text-primary-800"
-                      >
-                        {tag}
-                        <button
-                          type="button"
-                          onClick={() => handleRemoveItem('tags', tag)}
-                          className="ml-1 text-primary-600 hover:text-primary-800"
-                        >
-                          ×
-                        </button>
-                      </span>
-                    ))}
-                  </div>
-                )}
-              </div>
-
-              {/* Dish Cuisine */}
-              <div>
-                <label className="block text-sm font-medium text-neutral-700 mb-1">
-                  Dish Cuisine
-                </label>
-                <select
-                  value=""
-                  onChange={(e) => {
-                    handleDropdownSelect('cuisine', e.target.value);
-                    e.target.value = ''; // Reset dropdown
-                  }}
-                  className="w-full p-3 border border-neutral-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
-                >
-                  <option value="">Select cuisine</option>
-                  {dishCuisines.map(cuisine => (
-                    <option key={cuisine.id} value={cuisine.name}>
-                      {cuisine.name}
-                    </option>
-                  ))}
-                </select>
-                {formData.cuisine.length > 0 && (
-                  <div className="flex flex-wrap gap-2 mt-2">
-                    {formData.cuisine.map((cuisine, index) => (
-                      <span
-                        key={index}
-                        className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800"
-                      >
-                        {cuisine}
-                        <button
-                          type="button"
-                          onClick={() => handleRemoveItem('cuisine', cuisine)}
-                          className="ml-1 text-green-600 hover:text-green-800"
-                        >
-                          ×
-                        </button>
-                      </span>
-                    ))}
-                  </div>
-                )}
-              </div>
-
-              {/* Dish Dietary Flags */}
-              <div>
-                <label className="block text-sm font-medium text-neutral-700 mb-1">
-                  Dietary Flags
-                </label>
-                <select
-                  value=""
-                  onChange={(e) => {
-                    handleDropdownSelect('dietaryFlags', e.target.value);
-                    e.target.value = ''; // Reset dropdown
-                  }}
-                  className="w-full p-3 border border-neutral-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
-                >
-                  <option value="">Select dietary flag</option>
-                  {dishDietaryFlags.map(flag => (
-                    <option key={flag.id} value={flag.name}>
-                      {flag.name}
-                    </option>
-                  ))}
-                </select>
-                {formData.dietaryFlags.length > 0 && (
-                  <div className="flex flex-wrap gap-2 mt-2">
-                    {formData.dietaryFlags.map((flag, index) => (
-                      <span
-                        key={index}
-                        className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800"
-                      >
-                        {flag}
-                        <button
-                          type="button"
-                          onClick={() => handleRemoveItem('dietaryFlags', flag)}
-                          className="ml-1 text-blue-600 hover:text-blue-800"
-                        >
-                          ×
-                        </button>
-                      </span>
-                    ))}
-                  </div>
-                )}
               </div>
 
               {/* Toggle Switches */}

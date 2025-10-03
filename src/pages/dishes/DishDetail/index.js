@@ -5,7 +5,7 @@ import { useAuth } from '../../../hooks/useAuth';
 import { PERMISSIONS } from '../../../contexts/PermissionRegistry';
 import DishVariantsTab from './DishVariantsTab';
 import DishAvailabilityTab from './DishAvailabilityTab';
-import DishCategoryTab from './DishCategoryTab';
+import DishSegmentTab from './DishSegmentTab';
 import DishMediaTab from './DishMediaTab';
 import DialogueBox from '../../../components/DialogueBox';
 import EditDishModal from '../../../components/EditDishModal';
@@ -118,7 +118,7 @@ const DishDetail = () => {
   const tabs = [
     { id: 'variants', name: 'Dish Variants', component: DishVariantsTab },
     { id: 'availability', name: 'Dish Availability', component: DishAvailabilityTab },
-    { id: 'category', name: 'Dish Category', component: DishCategoryTab },
+    { id: 'segment', name: 'Dish Segment', component: DishSegmentTab },
     { id: 'media', name: 'Dish Media', component: DishMediaTab }
   ];
 
@@ -186,7 +186,7 @@ const DishDetail = () => {
             {canEditDish && (
               <button
                 onClick={() => setIsEditModalOpen(true)}
-                className="inline-flex items-center px-4 py-2 border border-transparent shadow-sm text-sm font-medium rounded-md text-white bg-primary-600 hover:bg-primary-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500"
+                className="px-4 py-2 border border-neutral-300 rounded-full shadow-sm text-sm font-medium text-neutral-700 bg-white hover:bg-neutral-50 flex items-center"
               >
                 <PencilIcon className="h-4 w-4 mr-2" />
                 Edit Dish
@@ -211,9 +211,6 @@ const DishDetail = () => {
                     Sold Out
                   </span>
                 )}
-                <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
-                  {dish.status}
-                </span>
               </div>
             </div>
             
@@ -222,85 +219,24 @@ const DishDetail = () => {
               <p className="text-neutral-600">{dish.description}</p>
             </div>
             
-            {/* Additional dish details */}
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mb-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               {dish.category && (
                 <div>
                   <span className="font-medium text-neutral-700">Category:</span>
                   <span className="ml-2 text-neutral-600 capitalize">{dish.category.replace('-', ' ')}</span>
                 </div>
               )}
-              {dish.course && (
-                <div>
-                  <span className="font-medium text-neutral-700">Course:</span>
-                  <span className="ml-2 text-neutral-600 capitalize">{dish.course}</span>
-                </div>
-              )}
               <div>
-                <span className="font-medium text-neutral-700">Customizable:</span>
+                <span className="font-medium text-neutral-700">Allow Customization:</span>
                 <span className="ml-2 text-neutral-600">{dish.allowCustomization ? 'Yes' : 'No'}</span>
               </div>
-            </div>
-            
-            {/* Tags, Cuisine, and Dietary Flags */}
-            {(dish.tags?.length > 0 || dish.cuisine?.length > 0 || dish.dietaryFlags?.length > 0) && (
-              <div className="mb-4 space-y-2">
-                {dish.tags?.length > 0 && (
-                  <div>
-                    <span className="text-sm font-medium text-neutral-700 mr-2">Tags:</span>
-                    <div className="inline-flex flex-wrap gap-1">
-                      {dish.tags.map((tag, index) => (
-                        <span
-                          key={index}
-                          className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-primary-100 text-primary-800"
-                        >
-                          {tag}
-                        </span>
-                      ))}
-                    </div>
-                  </div>
-                )}
-                {dish.cuisine?.length > 0 && (
-                  <div>
-                    <span className="text-sm font-medium text-neutral-700 mr-2">Cuisine:</span>
-                    <div className="inline-flex flex-wrap gap-1">
-                      {dish.cuisine.map((cuisine, index) => (
-                        <span
-                          key={index}
-                          className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-green-100 text-green-800"
-                        >
-                          {cuisine}
-                        </span>
-                      ))}
-                    </div>
-                  </div>
-                )}
-                {dish.dietaryFlags?.length > 0 && (
-                  <div>
-                    <span className="text-sm font-medium text-neutral-700 mr-2">Dietary:</span>
-                    <div className="inline-flex flex-wrap gap-1">
-                      {dish.dietaryFlags.map((flag, index) => (
-                        <span
-                          key={index}
-                          className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-blue-100 text-blue-800"
-                        >
-                          {flag}
-                        </span>
-                      ))}
-                    </div>
-                  </div>
-                )}
-              </div>
-            )}
-            
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
               <div>
-                <span className="font-medium text-neutral-700">Created:</span>
-                <span className="ml-2 text-neutral-600">{formatDate(dish.createdAt)}</span>
+                <span className="font-medium text-neutral-700">Allow Negotiation:</span>
+                <span className="ml-2 text-neutral-600">{dish.allowNegotiation ? 'Yes' : 'No'}</span>
               </div>
               <div>
-                <span className="font-medium text-neutral-700">Last Updated:</span>
-                <span className="ml-2 text-neutral-600">{formatDate(dish.updatedAt)}</span>
+                <span className="font-medium text-neutral-700">Sold Out:</span>
+                <span className="ml-2 text-neutral-600">{dish.isSoldOut ? 'Yes' : 'No'}</span>
               </div>
             </div>
           </div>

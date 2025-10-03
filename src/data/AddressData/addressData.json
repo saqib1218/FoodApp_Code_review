@@ -1,0 +1,22 @@
+{
+  "countries": [
+    { "id": "PK", "name": "Pakistan" }
+  ],
+  "cities": [
+    { "id": "KHI", "countryId": "PK", "name": "Karachi" }
+  ],
+  "cityZones": {
+    "KHI": [
+      { "id": "DHA", "name": "DHA" },
+      { "id": "Clifton", "name": "Clifton" },
+      { "id": "Gulshan", "name": "Gulshan-e-Iqbal" },
+      { "id": "Gulistan", "name": "Gulistan-e-Jauhar" },
+      { "id": "Nazimabad", "name": "Nazimabad" },
+      { "id": "Bahadurabad", "name": "Bahadurabad" },
+      { "id": "Korangi", "name": "Korangi" },
+      { "id": "Malir", "name": "Malir" },
+      { "id": "NorthNazimabad", "name": "North Nazimabad" },
+      { "id": "PECHS", "name": "PECHS" }
+    ]
+  }
+}
