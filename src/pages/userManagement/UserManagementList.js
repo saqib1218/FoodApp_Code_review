@@ -1198,60 +1198,60 @@ const UserManagementList = () => {
             </div>
 
             {/* Modal Content */}
-            <div className="flex-1 p-6">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6 h-[300px]">
-              {/* Available Permissions */}
-              <div className="flex flex-col">
-                <h4 className="text-sm font-medium text-gray-700 mb-3">Available Permissionff</h4>
-                <div
-                  className="border-2 border-dashed border-gray-300 rounded-lg p-4 bg-gray-50 h-[300px] overflow-y-auto"
-                  onDragOver={handleDragOver}
-                  onDrop={handleDropToAvailable}
-                >
-                  <div className="space-y-2">
-                    {currentAvailablePermissions.map((permission) => (
-                      <div
-                        key={permission.id}
-                        draggable
-                        onDragStart={(e) => handleDragStart(e, permission, 'available')}
-                        className="bg-white p-3 rounded-md border border-gray-200 cursor-move hover:bg-gray-50 transition-colors"
-                      >
-                        <span className="text-sm font-medium text-gray-900">{permission.name}</span>
-                        <p className="text-xs text-gray-500">{permission.key}</p>
-                      </div>
-                    ))}
+              <div className="flex-1 p-6">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6 h-[300px]">
+                {/* Available Permissions */}
+                <div className="flex flex-col">
+                  <h4 className="text-sm font-medium text-gray-700 mb-3">Available Permissions</h4>
+                  <div
+                    className="border-2 border-dashed border-gray-300 rounded-lg p-4 bg-gray-50 h-[300px] overflow-y-auto"
+                    onDragOver={handleDragOver}
+                    onDrop={handleDropToAvailable}
+                  >
+                    <div className="space-y-2">
+                      {currentAvailablePermissions.map((permission) => (
+                        <div
+                          key={permission.id}
+                          draggable
+                          onDragStart={(e) => handleDragStart(e, permission, 'available')}
+                          className="bg-white p-3 rounded-md border border-gray-200 cursor-move hover:bg-gray-50 transition-colors"
+                        >
+                          <span className="text-sm font-medium text-gray-900">{permission.name}</span>
+                          <p className="text-xs text-gray-500">{permission.key}</p>
+                        </div>
+                      ))}
+                    </div>
                   </div>
                 </div>
-              </div>
 
-              {/* Assigned Permissions */}
-              <div className="flex flex-col">
-                <h4 className="text-sm font-medium text-gray-700 mb-3">Assigned Permissions</h4>
-                <div
-                  className="border-2 border-dashed border-primary-300 rounded-lg p-4 bg-primary-50 h-[300px] overflow-y-auto"
-                  onDragOver={handleDragOver}
-                  onDrop={handleDropToAssigned}
-                >
-                  <div className="space-y-2">
-                    {assignedPermissions.map((permission) => (
-                      <div
-                        key={permission.id}
-                        draggable
-                        onDragStart={(e) => handleDragStart(e, permission, 'assigned')}
-                        className="bg-white p-3 rounded-md border border-primary-200 cursor-move hover:bg-primary-50 transition-colors"
-                      >
-                        <span className="text-sm font-medium text-gray-900">{permission.name}</span>
-                        <p className="text-xs text-gray-500">{permission.key}</p>
-                      </div>
-                    ))}
-                    {assignedPermissions.length === 0 && (
-                      <p className="text-gray-500 text-center py-8">Drag permissions here to assign them</p>
-                    )}
+                {/* Assigned Permissions */}
+                <div className="flex flex-col">
+                  <h4 className="text-sm font-medium text-gray-700 mb-3">Assigned Permissions</h4>
+                  <div
+                    className="border-2 border-dashed border-primary-300 rounded-lg p-4 bg-primary-50 h-[300px] overflow-y-auto"
+                    onDragOver={handleDragOver}
+                    onDrop={handleDropToAssigned}
+                  >
+                    <div className="space-y-2">
+                      {assignedPermissions.map((permission) => (
+                        <div
+                          key={permission.id}
+                          draggable
+                          onDragStart={(e) => handleDragStart(e, permission, 'assigned')}
+                          className="bg-white p-3 rounded-md border border-primary-200 cursor-move hover:bg-primary-50 transition-colors"
+                        >
+                          <span className="text-sm font-medium text-gray-900">{permission.name}</span>
+                          <p className="text-xs text-gray-500">{permission.key}</p>
+                        </div>
+                      ))}
+                      {assignedPermissions.length === 0 && (
+                        <p className="text-gray-500 text-center py-8">Drag permissions here to assign them</p>
+                      )}
+                    </div>
                   </div>
                 </div>
+                </div>
               </div>
-              </div>
-            </div>
 
             {/* Modal Footer */}
             <div className="flex justify-end space-x-3 p-6 pt-4 border-t border-gray-200 flex-shrink-0">

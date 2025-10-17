@@ -2,8 +2,9 @@ import React, { useState } from 'react';
 import { XMarkIcon } from '@heroicons/react/24/outline';
 import DialogueBox from './DialogueBox';
 import dishDropdownData from '../data/dishDropdown/dishDropdownData.json';
+import { useCreateDishStandaloneMutation } from '../store/api/modules/dishes/dishesApi';
 
-const AddDishModal = ({ isOpen, onClose, onSave, kitchenId, onDishAdded }) => {
+const AddDishModal = ({ isOpen, onClose, kitchenId, onDishAdded }) => {
   const [formData, setFormData] = useState({
     dishName: '',
     category: '',
@@ -12,6 +13,7 @@ const AddDishModal = ({ isOpen, onClose, onSave, kitchenId, onDishAdded }) => {
   });
   
   const [isLoading, setIsLoading] = useState(false);
+  const [createDish, { isLoading: isCreating }] = useCreateDishStandaloneMutation();
   
   // Get dropdown data from JSON file
   const { dishCategories } = dishDropdownData;
@@ -69,48 +71,48 @@ const AddDishModal = ({ isOpen, onClose, onSave, kitchenId, onDishAdded }) => {
 
     try {
       setIsLoading(true);
-      
-      // Prepare dish data
-      const dishData = {
-        id: Date.now(), // Mock ID for now
-        name: formData.dishName,
-        category: formData.category,
-        story: formData.story,
-        description: formData.description,
+
+      // Map category name -> dishCategoryId from dropdown JSON
+      const { dishCategories } = dishDropdownData;
+      const match = (dishCategories || []).find(c => (c.name || '').toLowerCase() === (formData.category || '').toLowerCase());
+      const dishCategoryId = match ? match.id : undefined;
+
+      const payload = {
         kitchenId,
-        status: 'active',
-        createdAt: new Date().toISOString()
+        name: formData.dishName,
+        dishCategoryId,
+        story: formData.story,
+        description: formData.description
       };
-      
-      // TODO: Replace with actual API call using RTK Query
-      console.log('Creating dish:', dishData);
-      
-      // Call the onDishAdded callback if provided, otherwise onSave
-      if (onDishAdded) {
-        onDishAdded(dishData);
-      } else if (onSave) {
-        await onSave(dishData);
+
+      console.log('POST /api/admin/dishes/create', payload);
+      const res = await createDish(payload).unwrap();
+
+      // Some backends return 200 with success:false. Handle that explicitly.
+      if (res && res.success === false) {
+        const msg = res?.message || res?.i18n_key || 'Failed to add dish.';
+        showDialogue('error', 'Add Failed', msg);
+        return; // Do not close or notify parent
       }
-      
-      // Show success message
-      showDialogue('success', 'Dish Added', 'Dish has been added successfully!');
-      
+
+      // Success feedback
+      const successMsg = res?.message || 'Dish has been added successfully!';
+      showDialogue('success', 'Dish Added', successMsg);
+
+      // Notify parent to refresh (if provided)
+      if (typeof onDishAdded === 'function') {
+        onDishAdded(res);
+      }
+
       // Reset form
-      setFormData({
-        dishName: '',
-        category: '',
-        story: '',
-        description: ''
-      });
-      
-      // Close modal after a short delay
-      setTimeout(() => {
-        onClose();
-      }, 1500);
-      
+      setFormData({ dishName: '', category: '', story: '', description: '' });
+
+      // Close modal after a short delay so user can see the success message
+      setTimeout(() => { onClose(); }, 1200);
     } catch (error) {
       console.error('Failed to add dish:', error);
-      showDialogue('error', 'Add Failed', `Failed to add dish: ${error.message || 'Unknown error occurred'}`);
+      const msg = error?.data?.message || error?.message || 'Unknown error occurred';
+      showDialogue('error', 'Add Failed', `Failed to add dish: ${msg}`);
     } finally {
       setIsLoading(false);
     }

@@ -30,6 +30,7 @@ import NotFound from './pages/NotFound';
 import Unauthorized from './pages/Unauthorized';
 import PermissionsDemo from './pages/PermissionsDemo';
 import Discounts from './pages/discounts/Discounts';
+import DiscountDetail from './pages/discounts/DiscountDetail';
 import Feedback from './pages/feedbacks/Feedback';
 import FeedbackDetail from './pages/feedbacks/FeedbackDetail';
 // Dish Management
@@ -38,6 +39,7 @@ import DishDetail from './pages/dishes/DishDetail';
 // Protected Route Components
 import ProtectedRoute from './components/ProtectedRoute';
 import KitchenDishDetailPage from './pages/kitchens/KitchenDishDetailPage';
+import KitchenRequestDetail from './pages/kitchens/KitchenRequestDetail';
 
 // Basic Authentication Route Component
 const AuthRoute = ({ children }) => {
@@ -96,6 +98,11 @@ function App() {
             <Route path="/kitchens/:kitchenId/dishes/:dishId" element={
               <ProtectedRoute routeName="kitchens">
                 <KitchenDishDetailPage />
+              </ProtectedRoute>
+            } />
+            <Route path="/kitchens/requests/:requestId" element={
+              <ProtectedRoute routeName="kitchens">
+                <KitchenRequestDetail />
               </ProtectedRoute>
             } />
             
@@ -174,6 +181,11 @@ function App() {
             <Route path="/discounts" element={
               <ProtectedRoute routeName="discounts">
                 <Discounts />
+              </ProtectedRoute>
+            } />
+            <Route path="/discounts/:id" element={
+              <ProtectedRoute routeName="discounts">
+                <DiscountDetail />
               </ProtectedRoute>
             } />
             

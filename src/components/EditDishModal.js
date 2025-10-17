@@ -8,7 +8,7 @@ const EditDishModal = ({ isOpen, onClose, dish, onSave }) => {
     dishName: '',
     story: '',
     description: '',
-    category: '',
+    dishCategoryId: '',
     allowCustomization: false,
     allowNegotiation: false,
     isSoldOut: false
@@ -30,11 +30,14 @@ const EditDishModal = ({ isOpen, onClose, dish, onSave }) => {
   // Initialize form data when dish changes
   useEffect(() => {
     if (dish && isOpen) {
+      // Reset any previous dialogue state on fresh open
+      setDialogueBox({ isOpen: false, type: 'success', title: '', message: '' });
+      setIsLoading(false);
       setFormData({
         dishName: dish.dishName || '',
         story: dish.story || '',
         description: dish.description || '',
-        category: dish.category || '',
+        dishCategoryId: dish.categoryId || '',
         allowCustomization: dish.allowCustomization || false,
         allowNegotiation: dish.allowNegotiation || false,
         isSoldOut: dish.isSoldOut || false
@@ -188,14 +191,14 @@ const EditDishModal = ({ isOpen, onClose, dish, onSave }) => {
                   Dish Category
                 </label>
                 <select
-                  name="category"
-                  value={formData.category}
+                  name="dishCategoryId"
+                  value={formData.dishCategoryId}
                   onChange={handleInputChange}
                   className="w-full p-3 border border-neutral-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
                 >
                   <option value="">Select category</option>
                   {dishCategories.map(category => (
-                    <option key={category.id} value={category.name}>
+                    <option key={category.id} value={String(category.id)}>
                       {category.name}
                     </option>
                   ))}

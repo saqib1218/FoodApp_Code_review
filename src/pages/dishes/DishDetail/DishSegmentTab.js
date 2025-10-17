@@ -4,6 +4,9 @@ import { DishContext } from './index';
 import DialogueBox from '../../../components/DialogueBox';
 import ConfirmationModal from '../../../components/ConfirmationModal';
 import dishDropdownData from '../../../data/dishDropdown/dishDropdownData.json';
+import { useAuth } from '../../../hooks/useAuth';
+import { PERMISSIONS } from '../../../contexts/PermissionRegistry';
+import { useGetDishByIdQuery, useUpdateDishByIdMutation } from '../../../store/api/modules/dishes/dishesApi';
 
 const rowsConfig = [
   { key: 'tags', label: 'Dish Tags', dropdownKey: 'dishTags' },
@@ -13,7 +16,9 @@ const rowsConfig = [
 ];
 
 const DishSegmentTab = () => {
-  const { dish, setDish } = useContext(DishContext);
+  const { id: dishId, dish, setDish } = useContext(DishContext);
+  const { hasPermission } = useAuth();
+  const canEdit = hasPermission(PERMISSIONS.USER_EDIT);
 
   const [dialogueBox, setDialogueBox] = useState({ isOpen: false, type: 'success', title: '', message: '' });
   const [showViewModal, setShowViewModal] = useState(false);
@@ -27,14 +32,37 @@ const DishSegmentTab = () => {
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [deleteKey, setDeleteKey] = useState(null);
 
+  // Fetch full dish detail when edit modal opens
+  const { data: dishDetailResp, refetch: refetchDishDetail } = useGetDishByIdQuery(
+    dishId,
+    { skip: !dishId, refetchOnMountOrArgChange: true }
+  );
+  const [updateDishById, { isLoading: isUpdating }] = useUpdateDishByIdMutation();
+
   const showDialogue = (type, title, message) => setDialogueBox({ isOpen: true, type, title, message });
   const closeDialogue = () => setDialogueBox({ isOpen: false, type: 'success', title: '', message: '' });
 
   const getRowValue = (key) => {
+    // Prefer latest names from dishDetailResp if available; fallback to dish context
+    const d = dishDetailResp?.data?.data || dishDetailResp?.data;
+    if (d) {
+      if (key === 'course') return d.coursetype?.name || '';
+      if (key === 'tags') return Array.isArray(d.tags) ? d.tags.map(t => t.name) : [];
+      if (key === 'cuisine') return Array.isArray(d.cuisines) ? d.cuisines.map(c => c.name) : [];
+      if (key === 'dietaryFlags') return Array.isArray(d.dietaryinfo) ? d.dietaryinfo.map(df => df.name) : [];
+      return [];
+    }
     if (!dish) return [];
     const value = dish[key];
     if (key === 'course') return value || '';
     return Array.isArray(value) ? value : [];
+  };
+
+  // Dropdown options: return array of { id, name }
+  const getOptions = (key) => {
+    const config = rowsConfig.find(r => r.key === key);
+    const raw = dishDropdownData[config.dropdownKey] || [];
+    return raw.map(i => ({ id: i.id ?? i.value ?? i.key ?? i, name: i.name ?? String(i) }));
   };
 
   const openView = (key) => {
@@ -42,24 +70,79 @@ const DishSegmentTab = () => {
     setShowViewModal(true);
   };
 
-  const openEdit = (key) => {
+  const openEdit = async (key) => {
     const config = rowsConfig.find(r => r.key === key);
-    const current = getRowValue(key);
-    // Initialize pending with current values (arrays for multi-select, or single string for course)
-    setPendingValues(config.single ? (current ? [current] : []) : [...current]);
+    // Ensure we have the latest dish detail before initializing pending
+    let d = dishDetailResp?.data?.data || dishDetailResp?.data;
+    try {
+      const res = await refetchDishDetail();
+      if (res?.data) d = res.data?.data || res.data;
+    } catch {}
+    if (d) {
+      if (key === 'course') {
+        setPendingValues(d.courseTypeId ? [d.courseTypeId] : []);
+      } else if (key === 'tags') {
+        setPendingValues(Array.isArray(d.tagIds) ? d.tagIds : (Array.isArray(d.tags) ? d.tags.map(t => t.id).filter(Boolean) : []));
+      } else if (key === 'cuisine') {
+        setPendingValues(Array.isArray(d.cuisineIds) ? d.cuisineIds : (Array.isArray(d.cuisines) ? d.cuisines.map(c => c.id).filter(Boolean) : []));
+      } else if (key === 'dietaryFlags') {
+        setPendingValues(Array.isArray(d.dietaryFlagIds) ? d.dietaryFlagIds : (Array.isArray(d.dietaryinfo) ? d.dietaryinfo.map(df => df.id).filter(Boolean) : []));
+      } else {
+        setPendingValues([]);
+      }
+    } else {
+      const current = getRowValue(key);
+      // Fallback: map names to option ids
+      const options = getOptions(key);
+      const nameToId = new Map(options.map(o => [o.name, o.id]));
+      if (config.single) {
+        setPendingValues(current ? [nameToId.get(current)] : []);
+      } else {
+        setPendingValues(current.map(n => nameToId.get(n)).filter(Boolean));
+      }
+    }
+
+    // Compute and log Selected and Available from latest data
+    try {
+      const options = getOptions(key); // [{id,name}]
+      // Build selected IDs from latest 'd' or from pending (fallback)
+      let selectedIds = [];
+      if (d) {
+        if (key === 'course') selectedIds = d.courseTypeId ? [d.courseTypeId] : [];
+        if (key === 'tags') selectedIds = Array.isArray(d.tagIds) ? d.tagIds : (Array.isArray(d.tags) ? d.tags.map(t => t.id).filter(Boolean) : []);
+        if (key === 'cuisine') selectedIds = Array.isArray(d.cuisineIds) ? d.cuisineIds : (Array.isArray(d.cuisines) ? d.cuisines.map(c => c.id).filter(Boolean) : []);
+        if (key === 'dietaryFlags') selectedIds = Array.isArray(d.dietaryFlagIds) ? d.dietaryFlagIds : (Array.isArray(d.dietaryinfo) ? d.dietaryinfo.map(df => df.id).filter(Boolean) : []);
+      }
+      if (!Array.isArray(selectedIds) || selectedIds.length === 0) {
+        // fallback to context ids
+        if (key === 'course' && dish?.courseTypeId != null) selectedIds = [dish.courseTypeId];
+        if (key === 'tags' && Array.isArray(dish?.tagIds)) selectedIds = dish.tagIds;
+        if (key === 'cuisine' && Array.isArray(dish?.cuisineIds)) selectedIds = dish.cuisineIds;
+        if (key === 'dietaryFlags' && Array.isArray(dish?.dietaryFlagIds)) selectedIds = dish.dietaryFlagIds;
+      }
+      const selectedNames = Array.isArray(selectedIds) ? selectedIds.map(id => idToName(key, id)) : [];
+      const selectedIdSet = new Set((selectedIds || []).map(x => String(x)));
+      const available = options.filter(o => !selectedIdSet.has(String(o.id)));
+      const availableNames = available.map(o => o.name);
+      console.groupCollapsed(`[DishSegment][${key}] Selected vs Available`);
+      console.log('Selected IDs:', selectedIds);
+      console.log('Selected Names:', selectedNames);
+      console.log('Available IDs:', available.map(o => o.id));
+      console.log('Available Names:', availableNames);
+      console.groupEnd();
+    } catch {}
+
     setEditKey(key);
     setShowEditModal(true);
   };
 
   // Compute available list based on dropdown minus selected
-  const getAvailable = (key) => {
-    const config = rowsConfig.find(r => r.key === key);
-    return (dishDropdownData[config.dropdownKey] || []).map(i => i.name);
-  };
+  const getAvailable = (key) => getOptions(key);
   const availableItems = useMemo(() => {
     if (!editKey) return [];
     const all = getAvailable(editKey);
-    return all.filter(v => !pendingValues.includes(v));
+    const selectedSet = new Set((pendingValues || []).map(v => String(v)));
+    return all.filter(opt => !selectedSet.has(String(opt.id)));
   }, [editKey, pendingValues]);
 
   // Drag handlers (match permission UI behavior)
@@ -75,7 +158,7 @@ const DishSegmentTab = () => {
     e.preventDefault();
     if (!draggedItem) return;
     if (draggedFrom === 'selected') {
-      setPendingValues(prev => prev.filter(v => v !== draggedItem));
+      setPendingValues(prev => prev.filter(id => id !== (draggedItem.id ?? draggedItem)));
     }
     setDraggedItem(null);
     setDraggedFrom(null);
@@ -87,28 +170,172 @@ const DishSegmentTab = () => {
     setPendingValues(prev => {
       if (isSingle) {
         // Only keep the last dropped item
-        return draggedFrom === 'selected' ? prev : [draggedItem];
+        const nextId = draggedItem.id ?? draggedItem;
+        return draggedFrom === 'selected' ? prev : [nextId];
       }
-      if (prev.includes(draggedItem)) return prev;
-      return [...prev, draggedItem];
+      const nextId = draggedItem.id ?? draggedItem;
+      if (prev.includes(nextId)) return prev;
+      return [...prev, nextId];
     });
     setDraggedItem(null);
     setDraggedFrom(null);
   };
 
-  const handleSaveEdit = () => {
-    setDish(prev => {
-      if (!prev) return prev;
-      const updated = { ...prev };
-      if (editKey === 'course') {
-        updated.course = pendingValues[0] || '';
-      } else {
-        updated[editKey] = pendingValues;
+  const idToName = (key, id) => {
+    // Try dropdown options first
+    const options = getOptions(key);
+    const opt = options.find(o => String(o.id) === String(id));
+    if (opt) return opt.name;
+    // Fallback to names from latest dish detail arrays
+    const d = dishDetailResp?.data;
+    if (d) {
+      if (key === 'tags' && Array.isArray(d.tags)) {
+        const f = d.tags.find(t => String(t.id) === String(id));
+        if (f) return f.name;
       }
-      return updated;
-    });
-    setShowEditModal(false);
-    showDialogue('success', 'Updated', 'Dish segment has been updated.');
+      if (key === 'cuisine' && Array.isArray(d.cuisines)) {
+        const f = d.cuisines.find(c => String(c.id) === String(id));
+        if (f) return f.name;
+      }
+      if (key === 'dietaryFlags' && Array.isArray(d.dietaryinfo)) {
+        const f = d.dietaryinfo.find(df => String(df.id) === String(id));
+        if (f) return f.name;
+      }
+      if (key === 'course' && d.coursetype?.id && String(d.coursetype.id) === String(id)) {
+        return d.coursetype.name || String(id);
+      }
+    }
+    // Final fallback
+    return String(id);
+  };
+
+  const handleSaveEdit = async () => {
+    try {
+      // Always use the latest GET as baseline so we send past data as-is
+      const refreshed = await refetchDishDetail();
+      const base = refreshed?.data?.data || dishDetailResp?.data?.data || {};
+
+      const nameToIdMap = (key) => {
+        const opts = getOptions(key);
+        const map = new Map();
+        opts.forEach(o => map.set(String(o.name).toLowerCase(), o.id));
+        return map;
+      };
+      const toIds = (key, arr) => {
+        if (!Array.isArray(arr)) return [];
+        const map = nameToIdMap(key);
+        return arr
+          .map(x => {
+            if (x && typeof x === 'object') {
+              // object from GET {id, name}
+              return x.id ?? map.get(String(x.name).toLowerCase());
+            }
+            if (typeof x === 'number') return x;
+            if (typeof x === 'string') return map.get(x.toLowerCase());
+            return undefined;
+          })
+          .filter(v => v !== undefined && v !== null);
+      };
+
+      // Build full payload with all segments from latest GET
+      let payload = {
+        courseTypeId:
+          base.courseTypeId ||
+          (base.coursetype?.id || (base.coursetype?.name ? nameToIdMap('course').get(String(base.coursetype.name).toLowerCase()) : null)) ||
+          null,
+        tagIds: Array.isArray(base.tagIds) ? base.tagIds : toIds('tags', base.tags),
+        cuisineIds: Array.isArray(base.cuisineIds) ? base.cuisineIds : toIds('cuisine', base.cuisines),
+        dietaryFlagIds: Array.isArray(base.dietaryFlagIds) ? base.dietaryFlagIds : toIds('dietaryFlags', base.dietaryinfo),
+      };
+
+      // Fallbacks: if baseline lacked values, derive IDs from current UI names in context
+      try {
+        if ((!payload.tagIds || payload.tagIds.length === 0) && editKey !== 'tags') {
+          const currentTagNames = getRowValue('tags'); // names array from UI
+          payload.tagIds = toIds('tags', Array.isArray(currentTagNames) ? currentTagNames.map(n => ({ name: n })) : []);
+          // If still empty, fallback to context-stored IDs
+          if ((!payload.tagIds || payload.tagIds.length === 0) && Array.isArray(dish?.tagIds) && dish.tagIds.length > 0) {
+            payload.tagIds = dish.tagIds;
+          }
+        }
+        if ((!payload.cuisineIds || payload.cuisineIds.length === 0) && editKey !== 'cuisine') {
+          const currentCuisineNames = getRowValue('cuisine');
+          payload.cuisineIds = toIds('cuisine', Array.isArray(currentCuisineNames) ? currentCuisineNames.map(n => ({ name: n })) : []);
+          if ((!payload.cuisineIds || payload.cuisineIds.length === 0) && Array.isArray(dish?.cuisineIds) && dish.cuisineIds.length > 0) {
+            payload.cuisineIds = dish.cuisineIds;
+          }
+        }
+        if ((!payload.dietaryFlagIds || payload.dietaryFlagIds.length === 0) && editKey !== 'dietaryFlags') {
+          const currentDietaryNames = getRowValue('dietaryFlags');
+          payload.dietaryFlagIds = toIds('dietaryFlags', Array.isArray(currentDietaryNames) ? currentDietaryNames.map(n => ({ name: n })) : []);
+          if ((!payload.dietaryFlagIds || payload.dietaryFlagIds.length === 0) && Array.isArray(dish?.dietaryFlagIds) && dish.dietaryFlagIds.length > 0) {
+            payload.dietaryFlagIds = dish.dietaryFlagIds;
+          }
+        }
+        if ((payload.courseTypeId === null || payload.courseTypeId === undefined) && editKey !== 'course') {
+          const currentCourseName = getRowValue('course');
+          if (currentCourseName) {
+            const courseMap = nameToIdMap('course');
+            payload.courseTypeId = courseMap.get(String(currentCourseName).toLowerCase()) ?? null;
+          }
+          if ((payload.courseTypeId === null || payload.courseTypeId === undefined) && dish?.courseTypeId != null) {
+            payload.courseTypeId = dish.courseTypeId;
+          }
+        }
+      } catch {}
+
+      // Override only the edited segment with pendingValues
+      if (editKey === 'course') {
+        payload.courseTypeId = pendingValues[0] || null;
+      } else if (editKey === 'tags') {
+        payload.tagIds = pendingValues;
+      } else if (editKey === 'cuisine') {
+        payload.cuisineIds = pendingValues;
+      } else if (editKey === 'dietaryFlags') {
+        payload.dietaryFlagIds = pendingValues;
+      }
+
+      // Debug logs to verify what's being sent
+      try {
+        console.groupCollapsed('[DishSegment] Update Payload');
+        console.log('dishId:', dishId);
+        console.log('editKey:', editKey);
+        console.log('pendingValues (IDs):', pendingValues);
+        console.log('payload:', JSON.parse(JSON.stringify(payload)));
+        console.log('baseline (latest GET):', base);
+        console.log('context.ids:', {
+          courseTypeId: dish?.courseTypeId,
+          tagIds: dish?.tagIds,
+          cuisineIds: dish?.cuisineIds,
+          dietaryFlagIds: dish?.dietaryFlagIds,
+        });
+        console.groupEnd();
+      } catch {}
+
+      await updateDishById({ dishId, body: payload }).unwrap();
+
+      // Refetch to ensure we have latest server values for all segments
+      const refreshedAfter = await refetchDishDetail();
+      const d = refreshedAfter?.data || base;
+
+      // Update local dish context names for immediate UI reflection using latest detail
+      setDish(prev => {
+        if (!prev) return prev;
+        const updated = { ...prev };
+        if (d) {
+          updated.course = d.coursetype?.name || '';
+          updated.tags = Array.isArray(d.tags) ? d.tags.map(t => t.name) : [];
+          updated.cuisine = Array.isArray(d.cuisines) ? d.cuisines.map(c => c.name) : [];
+          updated.dietaryFlags = Array.isArray(d.dietaryinfo) ? d.dietaryinfo.map(df => df.name) : [];
+        }
+        return updated;
+      });
+
+      setShowEditModal(false);
+      showDialogue('success', 'Updated', 'Dish segment has been updated.');
+    } catch (err) {
+      showDialogue('error', 'Update Failed', err?.data?.message || 'Failed to update dish.');
+    }
   };
 
   const openDelete = (key) => {
@@ -173,15 +400,11 @@ const DishSegmentTab = () => {
                   <td className="px-6 py-4 text-sm text-neutral-900">{renderValue(row.key)}</td>
                   <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
                     <div className="flex justify-end space-x-2">
-                      <button onClick={() => openView(row.key)} className="text-green-600 hover:text-green-900" title="View">
-                        <EyeIcon className="h-4 w-4" />
-                      </button>
-                      <button onClick={() => openEdit(row.key)} className="text-primary-600 hover:text-primary-800" title="Edit">
-                        <PencilIcon className="h-4 w-4" />
-                      </button>
-                      <button onClick={() => openDelete(row.key)} className="text-red-600 hover:text-red-900" title="Clear">
-                        <TrashIcon className="h-4 w-4" />
-                      </button>
+                      {canEdit && (
+                        <button onClick={() => openEdit(row.key)} className="text-primary-600 hover:text-primary-800" title="Edit">
+                          <PencilIcon className="h-4 w-4" />
+                        </button>
+                      )}
                     </div>
                   </td>
                 </tr>
@@ -219,56 +442,75 @@ const DishSegmentTab = () => {
               </button>
             </div>
             <div className="px-6 pb-6">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6 h-[300px]">
-                {/* Available */}
-                <div className="flex flex-col">
-                  <h4 className="text-sm font-medium text-gray-700 mb-3">Available</h4>
-                  <div
-                    className="border-2 border-dashed border-gray-300 rounded-lg p-4 bg-gray-50 h-[300px] overflow-y-auto"
-                    onDragOver={handleDragOver}
-                    onDrop={handleDropToAvailable}
+              {editKey === 'course' ? (
+                <div className="space-y-4">
+                  <label className="block text-sm font-medium text-gray-700">Select Course Type</label>
+                  <select
+                    className="w-full p-2 border border-neutral-300 rounded-lg"
+                    value={pendingValues && pendingValues[0] != null ? String(pendingValues[0]) : ''}
+                    onChange={(e) => {
+                      const val = e.target.value;
+                      setPendingValues(val ? [Number(val)] : []);
+                    }}
                   >
-                    <div className="space-y-2">
-                      {availableItems.map((item) => (
-                        <div
-                          key={item}
-                          draggable
-                          onDragStart={(e) => handleDragStart(e, item, 'available')}
-                          className="bg-white p-3 rounded-md border border-gray-200 cursor-move hover:bg-gray-50 transition-colors"
-                        >
-                          <span className="text-sm font-medium text-gray-900">{item}</span>
-                        </div>
-                      ))}
+                    <option value="">-- Select --</option>
+                    {getOptions('course').map(opt => (
+                      <option key={opt.id} value={String(opt.id)}>{opt.name}</option>
+                    ))}
+                  </select>
+                </div>
+              ) : (
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6 h-[300px]">
+                  {/* Available */}
+                  <div className="flex flex-col">
+                    <h4 className="text-sm font-medium text-gray-700 mb-3">Available</h4>
+                    <div
+                      className="border-2 border-dashed border-gray-300 rounded-lg p-4 bg-gray-50 h-[300px] overflow-y-auto"
+                      onDragOver={handleDragOver}
+                      onDrop={handleDropToAvailable}
+                    >
+                      <div className="space-y-2">
+                        {availableItems.map((opt) => (
+                          <div
+                            key={opt.id}
+                            draggable
+                            onDragStart={(e) => handleDragStart(e, opt, 'available')}
+                            className="bg-white p-3 rounded-md border border-gray-200 cursor-move hover:bg-gray-50 transition-colors"
+                          >
+                            <span className="text-sm font-medium text-gray-900">{opt.name}</span>
+                          </div>
+                        ))}
+                      </div>
                     </div>
                   </div>
-                </div>
 
-                {/* Selected */}
-                <div className="flex flex-col">
-                  <h4 className="text-sm font-medium text-gray-700 mb-3">Selected</h4>
-                  <div
-                    className="border-2 border-dashed border-primary-300 rounded-lg p-4 bg-primary-50 h-[300px] overflow-y-auto"
-                    onDragOver={handleDragOver}
-                    onDrop={handleDropToSelected}
-                  >
-                    <div className="space-y-2">
-                      {pendingValues.map((item) => (
-                        <div
-                          key={item}
-                          draggable
-                          onDragStart={(e) => handleDragStart(e, item, 'selected')}
-                          className="bg-white p-3 rounded-md border border-primary-200 cursor-move hover:bg-primary-50 transition-colors"
-                        >
-                          <span className="text-sm font-medium text-gray-900">{item}</span>
-                        </div>
-                      ))}
-                      {pendingValues.length === 0 && (
-                        <p className="text-gray-500 text-center py-8">Drag items here to select them</p>
-                      )}
+                  {/* Selected */}
+                  <div className="flex flex-col">
+                    <h4 className="text-sm font-medium text-gray-700 mb-3">Selected</h4>
+                    <div
+                      className="border-2 border-dashed border-primary-300 rounded-lg p-4 bg-primary-50 h-[300px] overflow-y-auto"
+                      onDragOver={handleDragOver}
+                      onDrop={handleDropToSelected}
+                    >
+                      <div className="space-y-2">
+                        {pendingValues.map((id) => (
+                          <div
+                            key={id}
+                            draggable
+                            onDragStart={(e) => handleDragStart(e, id, 'selected')}
+                            className="bg-white p-3 rounded-md border border-primary-200 cursor-move hover:bg-primary-50 transition-colors"
+                          >
+                            <span className="text-sm font-medium text-gray-900">{idToName(editKey, id)}</span>
+                          </div>
+                        ))}
+                        {pendingValues.length === 0 && (
+                          <p className="text-gray-500 text-center py-8">Drag items here to select them</p>
+                        )}
+                      </div>
                     </div>
                   </div>
                 </div>
-              </div>
+              )}
 
               <div className="flex justify-end space-x-3 mt-6">
                 <button onClick={() => setShowEditModal(false)} className="px-4 py-2 bg-white border border-neutral-300 text-neutral-700 rounded-full hover:bg-neutral-50 text-sm font-medium">Cancel</button>

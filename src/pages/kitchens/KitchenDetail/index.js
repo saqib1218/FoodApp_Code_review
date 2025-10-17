@@ -2,7 +2,7 @@ import React, { useState, useEffect, createContext } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
 import { ArrowLeftIcon, PencilIcon, XMarkIcon } from '@heroicons/react/24/outline';
 import { CheckCircleIcon, ClockIcon, XCircleIcon } from '@heroicons/react/24/outline';
-import { useGetKitchenByIdQuery, useUpdateKitchenMutation } from '../../../store/api/modules/kitchens/kitchensApi';
+import { useGetKitchenByIdQuery, useUpdateKitchenMutation, useSubmitKitchenMutation } from '../../../store/api/modules/kitchens/kitchensApi';
 import { useAuth } from '../../../hooks/useAuth';
 import PermissionGate from '../../../components/PermissionGate';
 import ConfirmationModal from '../../../components/ConfirmationModal';
@@ -21,6 +21,7 @@ import KitchenOrdersTab from './KitchenOrdersTab';
 import KitchenDiscountsTab from './KitchenDiscountsTab';
 import KitchenEngagementTab from './KitchenEngagementTab';
 import KitchenFeedbackTab from './KitchenFeedbackTab';
+import KitchenRequestsTab from './KitchenRequestsTab';
 
 // Create context for sharing kitchen data across tabs
 export const KitchenContext = createContext(null);
@@ -34,12 +35,15 @@ const KitchenDetail = () => {
   const canViewKitchenDetails = hasPermission(PERMISSIONS.KITCHEN_DETAIL_VIEW);
   
   // RTK Query to fetch kitchen data - only if user has permission
-  const { data: kitchenResponse, isLoading, error } = useGetKitchenByIdQuery(id, {
-    skip: !canViewKitchenDetails
+  const { data: kitchenResponse, isLoading, error, refetch } = useGetKitchenByIdQuery(id, {
+    skip: !canViewKitchenDetails,
+    refetchOnMountOrArgChange: true,
+    refetchOnFocus: true,
   });
   
   // RTK Query mutation for updating kitchen
   const [updateKitchen, { isLoading: isUpdatingKitchen }] = useUpdateKitchenMutation();
+  const [submitKitchen, { isLoading: isSubmitting }] = useSubmitKitchenMutation();
   
   // State variables
   const [activeTab, setActiveTab] = useState('partners');
@@ -107,8 +111,9 @@ const KitchenDetail = () => {
 
   const handleUpdateKitchen = async () => {
     try {
+      // Always use the id from URL params to avoid mismatches
       const result = await updateKitchen({
-        id: kitchen.id,
+        id,
         ...editFormData
       }).unwrap();
 
@@ -119,6 +124,8 @@ const KitchenDetail = () => {
 
       // Close modal
       setShowEditModal(false);
+      // Refetch latest kitchen data so status/details update without manual refresh
+      refetch();
     } catch (err) {
       console.error('Failed to update kitchen:', err);
       
@@ -131,6 +138,8 @@ const KitchenDetail = () => {
   // Tab navigation handler
   const handleTabChange = (tab) => {
     setActiveTab(tab);
+    // Always refetch when switching tabs to avoid showing stale status/info
+    refetch();
   };
 
   // Status update handlers
@@ -257,7 +266,8 @@ const KitchenDetail = () => {
     discounts: <KitchenDiscountsTab />,
     feedback: <KitchenFeedbackTab />,
     analytics: <KitchenAnalyticsTab />,
-    orders: <KitchenOrdersTab />
+    orders: <KitchenOrdersTab />,
+    requests: <KitchenRequestsTab />,
   };
 
   return (
@@ -284,22 +294,36 @@ const KitchenDetail = () => {
               </button>
             </PermissionGate>
             
-            {kitchen.status !== 'active' && (
-              <button
-                onClick={() => handleStatusUpdate('active')}
-                className="px-4 py-2 border border-transparent rounded-full shadow-sm text-sm font-medium text-white bg-green-600 hover:bg-green-700"
-              >
-                Open Kitchen
-              </button>
-            )}
-            {kitchen.status === 'active' && (
-              <button
-                onClick={() => handleStatusUpdate('suspended')}
-                className="px-4 py-2 border border-transparent rounded-full shadow-sm text-sm font-medium text-white bg-primary-600 hover:bg-primary-700"
-              >
-                Close Kitchen
-              </button>
-            )}
+            {/* Submit for approval / Submitted */}
+            <PermissionGate permission={PERMISSIONS.KITCHEN_SUBMIT}>
+              {String(kitchen.status).toUpperCase() === 'DRAFT' && (
+                <button
+                  onClick={async () => {
+                    try {
+                      await submitKitchen(id).unwrap();
+                      showDialogue('success', 'Submitted', 'Kitchen submitted for approval.');
+                      // Refresh kitchen details to reflect new submitted status
+                      refetch();
+                    } catch (err) {
+                      const msg = err?.data?.message || 'Failed to submit kitchen for approval.';
+                      showDialogue('error', 'Error', msg);
+                    }
+                  }}
+                  disabled={isSubmitting}
+                  className="px-4 py-2 border border-transparent rounded-full shadow-sm text-sm font-medium text-white bg-primary-600 hover:bg-primary-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  {isSubmitting ? 'Submitting...' : 'Submit for Approval'}
+                </button>
+              )}
+              {String(kitchen.status).toUpperCase() === 'SUBMITTED' && (
+                <button
+                  disabled
+                  className="px-4 py-2 border border-transparent rounded-full shadow-sm text-sm font-medium text-white bg-primary-600 opacity-70 cursor-not-allowed"
+                >
+                  Submitted
+                </button>
+              )}
+            </PermissionGate>
           </div>
         </div>
 
@@ -401,6 +425,18 @@ const KitchenDetail = () => {
               }`}
             >
               Kitchen Availability
+            </button>
+
+            {/* Kitchen Requests Tab (always visible; content permission-gated) */}
+            <button
+              onClick={() => handleTabChange('requests')}
+              className={`py-4 px-1 border-b-2 font-medium text-sm ${
+                activeTab === 'requests'
+                  ? 'border-primary-500 text-primary-600'
+                  : 'border-transparent text-neutral-500 hover:text-neutral-700 hover:border-neutral-300'
+              }`}
+            >
+              Kitchen Requests
             </button>
             
             <button

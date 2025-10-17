@@ -1,8 +1,11 @@
 import React, { useState, useEffect, useContext } from 'react';
 import { XMarkIcon, PencilIcon, EyeIcon, TrashIcon, PlusIcon, MagnifyingGlassIcon, FunnelIcon, ChevronUpIcon, ChevronDownIcon } from '@heroicons/react/24/outline';
 import { useParams, useNavigate } from 'react-router-dom';
-// TODO: Replace with RTK Query hooks when migrating API calls
-import { mockDishes, getDishesByKitchenId, getDishCategories, getDishCuisines, getDishStatuses } from '../../../data/dishes/mockDishes';
+import { skipToken } from '@reduxjs/toolkit/query';
+// TODO: Remove mock helpers after full migration
+import { getDishCategories } from '../../../data/dishes/mockDishes';
+import { useGetKitchenDishesQuery } from '../../../store/api/modules/dishes/dishesApi';
+import { PERMISSIONS } from '../../../contexts/PermissionRegistry';
 import { useAuth } from '../../../hooks/useAuth';
 import { KitchenContext } from './index';
 import ConfirmationModal from '../../../components/ConfirmationModal';
@@ -11,7 +14,10 @@ import AddDishModal from '../../../components/AddDishModal';
 
 
 const KitchenDishesTab = () => {
-  const { id: kitchenId } = useContext(KitchenContext);
+  const { id: ctxKitchenId } = useContext(KitchenContext);
+  const params = useParams();
+  const urlKitchenId = params.id || params.kitchenId;
+  const kitchenId = urlKitchenId || ctxKitchenId;
   const { hasPermission } = useAuth();
   const navigate = useNavigate();
   
@@ -42,32 +48,36 @@ const KitchenDishesTab = () => {
   const [categories, setCategories] = useState([]);
 
 
-  // Load kitchen dishes and categories from static data
-  useEffect(() => {
-    const loadDishData = () => {
-      try {
-        setIsLoading(true);
-        // Get dishes for current kitchen using helper function
-        const dishesData = getDishesByKitchenId(parseInt(kitchenId));
-        const categoriesData = getDishCategories();
-        
-        setDishes(dishesData);
-        setCategories(categoriesData);
-      } catch (err) {
-        console.error('Failed to load kitchen dishes:', err);
-      } finally {
-        setIsLoading(false);
-      }
-    };
+  // Fetch dishes via RTK Query (fallback to mock categories only)
+  const { data: dishesResponse, isLoading: isDishesLoading, error: dishesError, refetch } = useGetKitchenDishesQuery(
+    kitchenId ? { kitchenId } : skipToken,
+    { skip: !kitchenId }
+  );
 
-    if (kitchenId) {
-      loadDishData();
+  useEffect(() => {
+    const categoriesData = getDishCategories();
+    setCategories(categoriesData);
+  }, []);
+
+  useEffect(() => {
+    if (dishesResponse) {
+      // API shape:
+      // {
+      //   success, code, message,
+      //   data: { count, dishes: [...], pagination: {...} }
+      // }
+      const list = Array.isArray(dishesResponse?.data?.dishes)
+        ? dishesResponse.data.dishes
+        : Array.isArray(dishesResponse)
+          ? dishesResponse
+          : [];
+      setDishes(list);
     }
-  }, [kitchenId]);
+  }, [dishesResponse]);
 
   // Handle dish view - navigate to detail page
   const handleViewDish = (dish) => {
-    navigate(`/kitchens/${kitchenId}/dishes/${dish.id}`);
+    navigate(`/dishes/${dish.id}`);
   };
   const handleAddDish = () => {
     setShowAddDishModal(true);
@@ -162,9 +172,9 @@ const KitchenDishesTab = () => {
 
   // Filter and sort dishes
   const filteredDishes = dishes.filter(dish => {
-    const matchesSearch = dish.name.toLowerCase().includes(searchTerm.toLowerCase());
-    const matchesStatus = filters.status === 'all' || dish.status === filters.status;
-    const matchesCategory = filters.category === 'all' || dish.category === filters.category;
+    const matchesSearch = (dish.name || '').toLowerCase().includes(searchTerm.toLowerCase());
+    const matchesStatus = filters.status === 'all' || (dish.status || '').toLowerCase() === filters.status.toLowerCase();
+    const matchesCategory = filters.category === 'all' || (dish.categoryName || '') === filters.category;
     const matchesDishType = filters.dishType === 'all' || dish.dishType === filters.dishType;
     
     let matchesLastUpdated = true;
@@ -197,8 +207,8 @@ const KitchenDishesTab = () => {
     
     // Handle specific field mappings
     if (sortField === 'name') {
-      aValue = a.name;
-      bValue = b.name;
+      aValue = a.name || '';
+      bValue = b.name || '';
     } else if (sortField === 'dishType') {
       aValue = a.dishType || '';
       bValue = b.dishType || '';
@@ -262,14 +272,15 @@ const KitchenDishesTab = () => {
           Manage dishes offered by this kitchen.
         </p>
         </div>
-      
-        <button
-          onClick={handleAddDish}
-          className="px-4 py-2 bg-primary-600 text-white rounded-full hover:bg-primary-700 transition-colors text-sm font-medium flex items-center"
-        >
-          <PlusIcon className="h-4 w-4 mr-1" />
-          Add Dish
-        </button>
+        {hasPermission(PERMISSIONS.DISH_CREATE) && (
+          <button
+            onClick={handleAddDish}
+            className="px-4 py-2 bg-primary-600 text-white rounded-full hover:bg-primary-700 transition-colors text-sm font-medium flex items-center"
+          >
+            <PlusIcon className="h-4 w-4 mr-1" />
+            Add Dish
+          </button>
+        )}
       </div>
 
       {/* Filters and Search */}
@@ -370,15 +381,24 @@ const KitchenDishesTab = () => {
           </div>
         </div>
       )}
-      {/* Dish Add Modal */}
-     
+      {/* Dish Add Modal rendered at the bottom */}
       {/* Dishes List */}
+      {!hasPermission(PERMISSIONS.KITCHEN_DISH_LIST_VIEW) ? (
+        <div className="bg-white rounded-lg border border-neutral-200 overflow-hidden">
+          <div className="text-center py-12">
+            <p className="text-neutral-500">You don't have access to view the dish list.</p>
+          </div>
+        </div>
+      ) : (
       <div className="bg-white rounded-lg border border-neutral-200 overflow-hidden">
         <div className="px-6 py-4 border-b border-neutral-200">
           <h4 className="text-base font-medium text-neutral-900">Dishes ({filteredDishes.length})</h4>
         </div>
-        
-        {filteredDishes.length === 0 ? (
+        {isDishesLoading ? (
+          <div className="flex items-center justify-center py-12">
+            <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-primary-500"></div>
+          </div>
+        ) : filteredDishes.length === 0 ? (
           <div className="text-center py-12 bg-neutral-50">
             <p className="text-neutral-500">No dishes found matching the selected filters.</p>
           </div>
@@ -392,94 +412,43 @@ const KitchenDishesTab = () => {
                     className="px-6 py-3 text-left text-xs font-medium text-neutral-500 uppercase tracking-wider cursor-pointer hover:bg-neutral-100 select-none"
                     onClick={() => handleSort('name')}
                   >
-                    Dish {getSortIcon('name')}
+                    Name {getSortIcon('name')}
                   </th>
-                  <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-neutral-500 uppercase tracking-wider">
-                    Category
-                  </th>
-                  <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-neutral-500 uppercase tracking-wider">
-                    Price
-                  </th>
-                  <th 
-                    scope="col" 
-                    className="px-6 py-3 text-left text-xs font-medium text-neutral-500 uppercase tracking-wider cursor-pointer hover:bg-neutral-100 select-none"
-                    onClick={() => handleSort('status')}
-                  >
-                    Status {getSortIcon('status')}
-                  </th>
-                  <th 
-                    scope="col" 
-                    className="px-6 py-3 text-left text-xs font-medium text-neutral-500 uppercase tracking-wider cursor-pointer hover:bg-neutral-100 select-none"
-                    onClick={() => handleSort('lastUpdated')}
-                  >
-                    Last Updated {getSortIcon('lastUpdated')}
-                  </th>
+                  <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-neutral-500 uppercase tracking-wider">Category</th>
+                  <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-neutral-500 uppercase tracking-wider">Status</th>
                   <th scope="col" className="px-6 py-3 text-right text-xs font-medium text-neutral-500 uppercase tracking-wider">
                     Actions
                   </th>
                 </tr>
               </thead>
               <tbody className="bg-white divide-y divide-neutral-200">
-                {filteredDishes.map((dish) => (
-                  <tr key={dish.id}>
+                {filteredDishes.map((dish, idx) => (
+                  <tr key={dish.id || idx} className="hover:bg-neutral-50">
                     <td className="px-6 py-4 whitespace-nowrap">
-                      <div className="flex items-center">
-                        <div className="h-10 w-10 rounded-md overflow-hidden bg-neutral-100 flex-shrink-0">
-                          {dish.image ? (
-                            <img
-                              src={dish.image}
-                              alt={dish.name}
-                              className="h-full w-full object-cover"
-                            />
-                          ) : (
-                            <div className="h-full w-full bg-neutral-200"></div>
-                          )}
-                        </div>
-                        <div className="ml-4">
-                          <div className="text-sm font-medium text-neutral-900">{dish.name}</div>
-                        </div>
-                      </div>
+                      <div className="text-sm font-medium text-neutral-900">{dish.name || '-'}</div>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
-                      <div className="text-sm text-neutral-700">{dish.category}</div>
+                      <div className="text-sm text-neutral-900">{dish.categoryName || '-'}</div>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
-                      <div className="text-sm text-neutral-700">{formatCurrency(dish.price)}</div>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${getStatusBadgeClass(dish.status)}`}>
-                        {dish.status.charAt(0).toUpperCase() + dish.status.slice(1)}
+                      <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
+                        (dish.status || '').toUpperCase() === 'ACTIVE' ? 'bg-green-100 text-green-800' :
+                        (dish.status || '').toUpperCase() === 'DRAFT' ? 'bg-neutral-100 text-neutral-800' :
+                        (dish.status || '').toUpperCase() === 'PENDING' ? 'bg-yellow-100 text-yellow-800' :
+                        'bg-gray-100 text-gray-800'
+                      }`}>
+                        {dish.status || '-'}
                       </span>
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <div className="text-sm text-neutral-500">
-                        {new Date(dish.lastStatusChange || dish.createdAt).toLocaleDateString()}
-                      </div>
-                    </td>
                     <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                      <div className="flex justify-end space-x-2">
-                        <button
-                          onClick={() => handleEditDish(dish)}
-                          className="text-blue-600 hover:text-blue-900 transition-colors"
-                          title="Edit dish"
-                        >
-                          <PencilIcon className="h-4 w-4" />
-                        </button>
-                        <button
-                          onClick={() => handleViewDishModal(dish)}
-                          className="text-green-600 hover:text-green-900 transition-colors"
-                          title="View dish"
-                        >
-                          <EyeIcon className="h-4 w-4" />
-                        </button>
-                        <button
-                          onClick={() => handleDeleteDish(dish)}
-                          className="text-red-600 hover:text-red-900 transition-colors"
-                          title="Delete dish"
-                        >
-                          <TrashIcon className="h-4 w-4" />
-                        </button>
-                      </div>
+                      <button
+                        onClick={() => dish.id ? handleViewDish(dish) : null}
+                        className={`transition-colors ${dish.id ? 'text-green-600 hover:text-green-900' : 'text-neutral-300 cursor-not-allowed'}`}
+                        title="View dish"
+                        disabled={!dish.id}
+                      >
+                        <EyeIcon className="h-4 w-4" />
+                      </button>
                     </td>
                   </tr>
                 ))}
@@ -488,6 +457,7 @@ const KitchenDishesTab = () => {
           </div>
         )}
       </div>
+      )}
 
 
 
@@ -666,16 +636,18 @@ const KitchenDishesTab = () => {
       )}
 
       {/* Add Dish Modal */}
-      <AddDishModal
-        isOpen={showAddDishModal}
-        onClose={() => setShowAddDishModal(false)}
-        kitchenId={kitchenId}
-        onDishAdded={(newDish) => {
-          // Add the new dish to the local state
-          setDishes(prev => [...prev, newDish]);
-          setShowAddDishModal(false);
-        }}
-      />
+      {showAddDishModal && (
+        <AddDishModal
+          isOpen={showAddDishModal}
+          onClose={() => setShowAddDishModal(false)}
+          kitchenId={kitchenId}
+          onDishAdded={() => {
+            // Do not close the modal here; let AddDishModal show its DialogueBox
+            // and close itself after a short delay. Just refresh the list.
+            refetch();
+          }}
+        />
+      )}
     </div>
   );
 };

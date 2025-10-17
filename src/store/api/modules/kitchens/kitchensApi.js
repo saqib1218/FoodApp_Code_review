@@ -160,7 +160,7 @@ export const kitchensApi = apiSlice.injectEndpoints({
       ],
     }),
     
-    getDishById: builder.query({
+    getKitchenDishById: builder.query({
       query: ({ kitchenId, dishId }) => `/admin/kitchens/${kitchenId}/dishes/${dishId}`,
       providesTags: (result, error, arg) => [{ type: 'Dish', id: arg.dishId }],
     }),
@@ -308,6 +308,7 @@ export const kitchensApi = apiSlice.injectEndpoints({
     // Kitchen Availability Management
     getKitchenAvailability: builder.query({
       query: (kitchenId) => `/admin/kitchens/${kitchenId}/availability`,
+      keepUnusedDataFor: 300,
       providesTags: (result, error, arg) => [
         { type: 'KitchenAvailability', id: arg },
         'KitchenAvailability'
@@ -349,6 +350,47 @@ export const kitchensApi = apiSlice.injectEndpoints({
         'KitchenAnalytics'
       ],
     }),
+
+    // Kitchen Requests
+    getKitchenRequests: builder.query({
+      // Note: backend path provided as /admin/kitchen/:kitchenId/requests (singular 'kitchen')
+      query: (kitchenId) => `/admin/kitchens/${kitchenId}/requests`,
+      providesTags: (result, error, arg) => [
+        { type: 'KitchenRequest', id: arg },
+        'KitchenRequest'
+      ],
+      refetchOnMountOrArgChange: true,
+    }),
+
+    // Submit kitchen for approval
+    submitKitchen: builder.mutation({
+      query: (kitchenId) => ({
+        url: `/admin/kitchens/${kitchenId}/submit`,
+        method: 'PATCH',
+      }),
+      invalidatesTags: (result, error, arg) => [
+        { type: 'Kitchen', id: arg },
+      ],
+    }),
+
+    // Request Detail (generic)
+    getRequestById: builder.query({
+      query: (requestId) => `/admin/requests/${requestId}`,
+      providesTags: (result, error, arg) => [
+        { type: 'KitchenRequest', id: arg },
+      ],
+    }),
+
+    // Approve request
+    approveRequest: builder.mutation({
+      query: (requestId) => ({
+        url: `/admin/requests/${requestId}/approve`,
+        method: 'PATCH',
+      }),
+      invalidatesTags: (result, error, arg) => [
+        { type: 'KitchenRequest', id: arg },
+      ],
+    }),
   }),
 });
 
@@ -374,7 +416,7 @@ export const {
   
   // Kitchen Dishes
   useGetKitchenDishesQuery,
-  useGetDishByIdQuery,
+  useGetKitchenDishByIdQuery,
   useCreateDishMutation,
   useUpdateDishMutation,
   useDeleteDishMutation,
@@ -399,4 +441,8 @@ export const {
   // Kitchen Analytics
   useGetKitchenAnalyticsQuery,
   useGetKitchenStatsQuery,
+  useGetKitchenRequestsQuery,
+  useSubmitKitchenMutation,
+  useGetRequestByIdQuery,
+  useApproveRequestMutation,
 } = kitchensApi;

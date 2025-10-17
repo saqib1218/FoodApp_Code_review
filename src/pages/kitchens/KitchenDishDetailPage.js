@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { ArrowLeftIcon, PencilIcon, TrashIcon } from '@heroicons/react/24/outline';
-import { useGetDishByIdQuery, useUpdateDishMutation } from '../../store/api/modules/kitchens/kitchensApi';
+import { useGetKitchenDishByIdQuery, useUpdateDishMutation } from '../../store/api/modules/kitchens/kitchensApi';
 import { useAuth } from '../../hooks/useAuth';
 import ConfirmationModal from '../../components/ConfirmationModal';
 
@@ -17,7 +17,7 @@ const KitchenDishDetailPage = () => {
     data: dish,
     isLoading,
     error
-  } = useGetDishByIdQuery({ kitchenId, dishId }, {
+  } = useGetKitchenDishByIdQuery({ kitchenId, dishId }, {
     skip: !kitchenId || !dishId
   });
 

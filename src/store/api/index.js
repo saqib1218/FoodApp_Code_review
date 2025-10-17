@@ -57,7 +57,8 @@ export const apiSlice = createApi({
   tagTypes: [
     // Core entities
     'Kitchen',
-    'Dish', 
+    'Dish',
+    'DishVariant', 
     'Order',
     'User',
     'Customer',

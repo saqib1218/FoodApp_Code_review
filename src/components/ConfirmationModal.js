@@ -5,8 +5,8 @@ const ConfirmationModal = ({
   isOpen,
   title,
   message,
-  comment,
-  onCommentChange,
+  comment = '',
+  onCommentChange = () => {},
   onConfirm,
   onCancel,
   confirmButtonText = "Confirm",
@@ -56,7 +56,7 @@ const ConfirmationModal = ({
                 Comment <span className="text-red-500">*</span>
               </label>
               <textarea
-                value={comment}
+                value={comment ?? ''}
                 onChange={(e) => onCommentChange(e.target.value)}
                 className="w-full p-2 border border-neutral-300 rounded-lg"
                 placeholder="Please provide a reason for this action..."
@@ -76,7 +76,7 @@ const ConfirmationModal = ({
           </button>
           <button
             onClick={onConfirm}
-            disabled={isCommentRequired && !comment.trim()}
+            disabled={isCommentRequired && !String(comment || '').trim()}
             className={`px-4 py-2 text-white rounded-full transition-colors text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed ${getButtonColorClass()}`}
           >
             {confirmButtonText}

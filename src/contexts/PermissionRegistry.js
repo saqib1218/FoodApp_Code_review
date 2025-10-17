@@ -32,6 +32,7 @@ export const PERMISSIONS = {
   KITCHEN_VIEW: 'admin.kitchen.view', // Kitchen permissions
   KITCHEN_LIST_VIEW: 'admin.kitchen.list.view',
   KITCHEN_DETAIL_VIEW: 'admin.kitchen.detail.view',
+  KITCHEN_DISH_LIST_VIEW: 'admin.kitchen.dish.list.view',
   KITCHEN_PARTNER_LIST_VIEW: 'admin.kitchen.partner.list.view',
   KITCHEN_ADDRESS_LIST_VIEW: 'admin.kitchen.address.list.view',
   KITCHEN_AVAILABILITY_VIEW: 'admin.kitchen.availability.view',
@@ -42,6 +43,8 @@ export const PERMISSIONS = {
   KITCHEN_ADDRESS_ADD: 'admin.kitchen.address.add',
   KITCHEN_ADDRESS_EDIT: 'admin.kitchen.address.edit',
   KITCHEN_AVAILABILITY_ADD: 'admin.kitchen.availability.add',
+  KITCHEN_SUBMIT: 'admin.kitchen.submit',
+  KITCHEN_REQUEST_LIST_VIEW: 'admin.kitchen.request.list.view',
 
   // Partner Management
   PARTNER_VIEW: 'admin.partner.view',
@@ -81,9 +84,16 @@ export const PERMISSIONS = {
   DISH_VARIANT_LIST_VIEW: 'admin.dish.variant.list.view',
   DISH_VARIANT_CREATE: 'admin.dish.variant.create',
   DISH_VARIANT_EDIT: 'admin.dish.variant.edit',
+  DISH_VARIANT_DETAIL_VIEW: 'admin.dish.variant.detail.view',
   DISH_VARIANT_DELETE: 'admin.dish.variant.delete',
+  DISH_VARIANT_ITEM_CREATE: 'admin.dish.variant.item.create',
+  DISH_VARIANT_ITEM_DETAIL_VIEW: 'admin.dish.variant.item.detail.view',
+  DISH_VARIANT_ITEM_EDIT: 'admin.dish.variant.item.edit',
+  DISH_VARIANT_ITEM_DELETE: 'admin.dish.variant.item.delete',
   
   // Dish Availability
+  DISH_AVAILABILITY_VIEW: 'admin.dish.availability.view',
+  DISH_AVAILABILITY_ADD: 'admin.dish.availability.add',
   DISH_AVAILABILITY_LIST_VIEW: 'admin.dish.availability.list.view',
   DISH_AVAILABILITY_CREATE: 'admin.dish.availability.create',
   DISH_AVAILABILITY_EDIT: 'admin.dish.availability.edit',
@@ -98,7 +108,18 @@ export const PERMISSIONS = {
   // Dish Media
   DISH_MEDIA_LIST_VIEW: 'admin.dish.media.list.view',
   DISH_MEDIA_UPLOAD: 'admin.dish.media.upload',
-  DISH_MEDIA_DELETE: 'admin.dish.media.delete'
+  DISH_MEDIA_DELETE: 'admin.dish.media.delete',
+  // Dish Special Event
+  DISH_SPECIAL_EVENT_CREATE: 'admin.dish.specialEvent.create',
+  DISH_SPECIAL_EVENT_LIST_VIEW: 'admin.dish.specialEvent.list.view',
+  DISH_SPECIAL_EVENT_DETAIL_VIEW: 'admin.dish.specialEvent.detail.view',
+  DISH_SPECIAL_EVENT_EDIT: 'admin.dish.specialEvent.edit',
+};
+
+// Additional granular permissions
+export const EXTRA_PERMISSIONS = {
+  REQUEST_DETAIL_VIEW: 'admin.request.detail.view',
+  REQUEST_APPROVE: 'admin.request.approve',
 };
 
 // Route-based permission mapping - Maps route names to required permissions

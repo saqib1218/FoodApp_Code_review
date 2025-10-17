@@ -4,19 +4,73 @@ import { useAuth } from '../../../hooks/useAuth';
 import { PERMISSIONS } from '../../../contexts/PermissionRegistry';
 import { DishContext } from './index';
 import DialogueBox from '../../../components/DialogueBox';
+import { useGetKitchenAvailabilityQuery } from '../../../store/api/modules/kitchens/kitchensApi';
+import { useGetDishAvailabilityQuery, useUpdateDishAvailabilityMutation } from '../../../store/api/modules/dishes/dishesApi';
 
 const DishAvailabilityTab = () => {
-  const { id: dishId } = useContext(DishContext);
+  const { id: dishId, dish } = useContext(DishContext);
   const { hasPermission } = useAuth();
   
-  // Check permissions - simplified to only use admin.dish.view
-  const canViewAvailability = hasPermission(PERMISSIONS.DISH_VIEW);
+  // Permission gate
+  const canViewAvailability = hasPermission(PERMISSIONS.DISH_AVAILABILITY_VIEW);
+  const canEditDishAvailability = hasPermission(PERMISSIONS.DISH_AVAILABILITY_ADD);
 
   // Loading state
   const [isLoading, setIsLoading] = useState(false);
+  // Kitchen availability fetch using kitchen id from dish detail
+  const kitchenId = dish?.kitchen?.id || dish?.kitchenId;
+  const { data: kitchenAvailabilityResp, isLoading: isKitchenAvailabilityLoading, isFetching: isKitchenAvailabilityFetching, refetch: refetchKitchenAvailability } = useGetKitchenAvailabilityQuery(kitchenId, {
+    skip: !kitchenId,
+    refetchOnMountOrArgChange: true,
+    refetchOnFocus: true,
+    refetchOnReconnect: true,
+    pollingInterval: 0,
+  });
+
+  // Dish availability fetch using dish id (separate API)
+  const { data: dishAvailabilityResp, isLoading: isDishAvailabilityLoading, isFetching: isDishAvailabilityFetching, refetch: refetchDishAvailability } = useGetDishAvailabilityQuery(dishId, {
+    skip: !dishId,
+    refetchOnMountOrArgChange: true,
+    refetchOnFocus: true,
+    refetchOnReconnect: true,
+    pollingInterval: 0,
+  });
 
   // Availability grid state (day x meal slot)
   const [availabilityData, setAvailabilityData] = useState([]);
+  const [updateDishAvailability, { isLoading: isUpdatingDishAvailability }] = useUpdateDishAvailabilityMutation();
+
+  // When kitchen availability loads, normalize it into our grid state
+  useEffect(() => {
+    const raw = kitchenAvailabilityResp?.data || kitchenAvailabilityResp;
+    if (!Array.isArray(raw)) {
+      // Unknown shape (e.g., data: [{ days: [...] }]). Avoid crashing; leave empty until proper mapping is implemented.
+      setAvailabilityData([]);
+      return;
+    }
+    const toHM = (t) => (typeof t === 'string' && t.length >= 5 ? t.slice(0, 5) : (t || ''));
+    const toLabel = (name) => {
+      const base = typeof name === 'string' ? name : (name?.name ?? '');
+      const s = String(base || '');
+      return s ? s.charAt(0).toUpperCase() + s.slice(1) : '';
+    };
+    const normalized = raw
+      .filter((item) => item && (item.day || item.slot)) // only map items that match expected structure
+      .map((item) => {
+        const dayId = item?.day?.id ?? item?.day ?? null;
+        const dayName = item?.day?.name ?? item?.day ?? '';
+        const slotId = item?.slot?.id ?? item?.slot ?? null;
+        const slotName = item?.slot?.name ?? item?.slot ?? '';
+        return {
+          day: { id: dayId, name: typeof dayName === 'string' ? dayName : String(dayName || '') },
+          slot: { id: slotId, name: typeof slotName === 'string' ? slotName : String(slotName || ''), label: toLabel(slotName) },
+          isAvailable: Boolean(item?.isAvailable),
+          customStartTime: toHM(item?.customStartTime || item?.slot?.defaultStartTime),
+          customEndTime: toHM(item?.customEndTime || item?.slot?.defaultEndTime),
+        };
+      });
+    setAvailabilityData(normalized);
+  }, [kitchenAvailabilityResp]);
 
   // Edit modal state
   const [showEditModal, setShowEditModal] = useState(false);
@@ -27,7 +81,7 @@ const DishAvailabilityTab = () => {
     startTime: '08:00',
     endTime: '10:00'
   });
-  const [timeErrors, setTimeErrors] = useState({ startTime: '', endTime: '' });
+  // Note: removed unused timeErrors to satisfy ESLint
   
   // Dialogue box state
   const [dialogueBox, setDialogueBox] = useState({
@@ -72,6 +126,39 @@ const DishAvailabilityTab = () => {
     }
   }, [dishId, canViewAvailability]);
 
+  // Force refetch kitchen availability every time tab mounts or kitchenId changes
+  useEffect(() => {
+    if (kitchenId) {
+      refetchKitchenAvailability();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [kitchenId]);
+
+  // Force refetch dish availability every time tab mounts or dishId changes
+  useEffect(() => {
+    if (dishId) {
+      refetchDishAvailability();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [dishId]);
+
+  // Helper to determine if kitchen is open for given day/slot
+  const isKitchenOpen = (dayId, slotId) => {
+    const data = kitchenAvailabilityResp?.data || kitchenAvailabilityResp;
+    const availList = Array.isArray(data) ? data : (data?.availability || data?.slots || []);
+    const dId = String(dayId);
+    const sId = Number(slotId);
+    if (Array.isArray(availList)) {
+      const match = availList.find((a) => {
+        const aDay = String(a?.day?.id ?? a?.dayId ?? a?.day);
+        const aSlot = Number(a?.slot?.id ?? a?.slotId ?? a?.slot);
+        return aDay === dId && aSlot === sId;
+      });
+      return Boolean(match?.isAvailable ?? match?.open ?? false);
+    }
+    return false;
+  };
+
   // Days of the week
   const daysOfWeek = [
     { id: 'Mon', name: 'Monday' },
@@ -111,93 +198,95 @@ const DishAvailabilityTab = () => {
   };
 
   const handleEditTimeSlot = (day, slot) => {
+    if (!isKitchenOpen(day.id, slot.id)) {
+      showDialogue('error', 'Kitchen Closed', 'This slot cannot be edited because the kitchen is closed for this time.');
+      return;
+    }
     setEditingDay(day);
     setEditingMeal(slot);
-    const availability = getAvailabilityForDaySlot(day.id, slot.id);
-    const constraints = mealPeriods.find(p => p.id === slot.id);
+    // Initialize from dish availability for this slot
+    const dishEnabled = isDishAvailableForSlot(day.id, slot.id);
     setFormData({
-      isAvailable: availability?.isAvailable || false,
-      startTime: availability?.customStartTime || constraints?.defaultStart || '08:00',
-      endTime: availability?.customEndTime || constraints?.defaultEnd || '10:00'
+      isAvailable: dishEnabled,
+      startTime: '',
+      endTime: ''
     });
-    setTimeErrors({ startTime: '', endTime: '' });
     setShowEditModal(true);
   };
 
-  const getCurrentMealConstraints = () => {
-    if (!editingMeal) return null;
-    return mealPeriods.find(p => p.id === editingMeal.id);
-  };
-
-  const isTimeValid = (time) => {
-    const c = getCurrentMealConstraints();
-    if (!c || !time) return true;
-    const val = time.replace(':', '');
-    return val >= c.minTime.replace(':', '') && val <= c.maxTime.replace(':', '');
-  };
-
-  const isStartBeforeEnd = (s, e) => {
-    if (!s || !e) return true;
-    return s < e;
-  };
 
   const handleFormChange = (e) => {
     const { name, type, checked, value } = e.target;
     if (name === 'isAvailable') {
       setFormData({ ...formData, isAvailable: checked });
-      setTimeErrors({ startTime: '', endTime: '' });
       return;
     }
-    if (name === 'startTime' || name === 'endTime') {
-      const newVal = value;
-      const newForm = { ...formData, [name]: newVal };
-      const errs = { ...timeErrors };
-      errs[name] = '';
-      if (!isTimeValid(newVal)) {
-        const c = getCurrentMealConstraints();
-        errs[name] = `${name === 'startTime' ? 'Start' : 'End'} time must be between ${c.minTime} and ${c.maxTime}`;
-        setTimeErrors(errs);
-        return;
-      }
-      if (name === 'startTime' && formData.endTime && !isStartBeforeEnd(newVal, formData.endTime)) {
-        errs.startTime = 'Start time must be before end time';
-        setTimeErrors(errs);
-        return;
-      }
-      if (name === 'endTime' && formData.startTime && !isStartBeforeEnd(formData.startTime, newVal)) {
-        errs.endTime = 'End time must be after start time';
-        setTimeErrors(errs);
-        return;
-      }
-      setTimeErrors(errs);
-      setFormData(newForm);
-      return;
-    }
+    // No custom time editing in dish availability per requirements
     setFormData({ ...formData, [name]: value });
   };
 
-  const handleSaveChanges = () => {
-    setAvailabilityData(prev => {
-      const others = prev.filter(i => !(i.day?.id === editingDay.id && i.slot?.id === editingMeal.id));
-      if (!formData.isAvailable) {
-        return others;
-      }
-      return [
-        ...others,
-        {
-          day: { id: editingDay.id, name: editingDay.name },
-          slot: { id: editingMeal.id, name: editingMeal.name, label: editingMeal.label },
-          isAvailable: formData.isAvailable,
-          customStartTime: formData.startTime,
-          customEndTime: formData.endTime
-        }
-      ];
-    });
-    setShowEditModal(false);
-    showDialogue('success', 'Updated', 'Dish availability has been updated.');
+  const handleSaveChanges = async () => {
+    try {
+      // Resolve ids for API
+      const findByDaySlot = (rawList, dayId, slotId) => {
+        if (!Array.isArray(rawList)) return undefined;
+        const dId = String(dayId);
+        const sId = Number(slotId);
+        return rawList.find((a) => {
+          const aDay = String(a?.day?.id ?? a?.dayId ?? a?.day);
+          const aSlot = Number(a?.slot?.id ?? a?.slotId ?? a?.slot);
+          return aDay === dId && aSlot === sId;
+        });
+      };
+
+      const rawKitchen = kitchenAvailabilityResp?.data || kitchenAvailabilityResp || [];
+      const kitchenMatch = findByDaySlot(Array.isArray(rawKitchen) ? rawKitchen : (rawKitchen?.data || []), editingDay.id, editingMeal.id);
+      const kitchenAvailabilityId = kitchenMatch?.kitchenAvailabilityId || kitchenMatch?.id || null;
+
+      const rawDish = dishAvailabilityResp?.data || dishAvailabilityResp || [];
+      const dishMatch = findByDaySlot(Array.isArray(rawDish) ? rawDish : (rawDish?.data || []), editingDay.id, editingMeal.id);
+      const dishAvailabilityId = dishMatch?.id || dishMatch?.dishAvailabilityId || null;
+
+      await updateDishAvailability({
+        dishId,
+        body: {
+          isAvailable: Boolean(formData.isAvailable),
+          kitchenAvailabilityId,
+          dishAvailabilityId,
+        },
+      }).unwrap();
+
+      setShowEditModal(false);
+      showDialogue('success', 'Updated', 'Dish availability has been updated.');
+      // Refresh the dish availability to reflect latest state
+      refetchDishAvailability();
+    } catch (err) {
+      showDialogue('error', 'Update Failed', err?.data?.message || 'Failed to update dish availability.');
+    }
   };
 
-  if (isLoading) {
+  const hasKitchenAvailabilityData = Array.isArray(kitchenAvailabilityResp?.data || kitchenAvailabilityResp);
+  const hasDishAvailabilityData = Array.isArray(dishAvailabilityResp?.data || dishAvailabilityResp);
+
+  if (!canViewAvailability) {
+    return (
+      <div className="flex items-center justify-center min-h-96">
+        <div className="text-center">
+          <h3 className="text-lg font-medium text-neutral-900 mb-2">Access Denied</h3>
+          <p className="text-neutral-500">You don't have permission to access dish availability.</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (
+    isKitchenAvailabilityLoading ||
+    isKitchenAvailabilityFetching ||
+    isDishAvailabilityLoading ||
+    isDishAvailabilityFetching ||
+    !hasKitchenAvailabilityData ||
+    !hasDishAvailabilityData
+  ) {
     return (
       <div className="flex items-center justify-center py-12">
         <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary-600"></div>
@@ -206,6 +295,39 @@ const DishAvailabilityTab = () => {
     );
   }
 
+  // Helper: determine whether dish is available for a given day/slot based on dishAvailabilityResp
+  const isDishAvailableForSlot = (dayId, slotId) => {
+    const raw = dishAvailabilityResp?.data || dishAvailabilityResp;
+    const dId = String(dayId);
+    const sId = Number(slotId);
+
+    // Shape A: nested array with days[].slots[] (as per latest response)
+    if (Array.isArray(raw)) {
+      for (const entry of raw) {
+        const days = Array.isArray(entry?.days) ? entry.days : [];
+        for (const day of days) {
+          const dayKey = String(day?.dayOfWeekId || day?.dayId || day?.id || day?.day || '');
+          if (dayKey !== dId) continue;
+          const slots = Array.isArray(day?.slots) ? day.slots : [];
+          const slotMatch = slots.find(s => Number(s?.slotId || s?.id || s?.slot) === sId);
+          if (slotMatch) return Boolean(entry?.isAvailable);
+        }
+      }
+    }
+
+    // Shape B: flat list of availability objects with day/slot fields
+    const list = Array.isArray(raw) ? raw : (raw?.availability || raw?.slots || []);
+    if (Array.isArray(list)) {
+      const match = list.find((a) => {
+        const aDay = String(a?.day?.id ?? a?.dayId ?? a?.day);
+        const aSlot = Number(a?.slot?.id ?? a?.slotId ?? a?.slot);
+        return aDay === dId && aSlot === sId;
+      });
+      if (match) return Boolean(match?.isAvailable ?? match?.available ?? false);
+    }
+    return false;
+  };
+
   return (
     <div>
       <div className="mb-6">
@@ -213,14 +335,7 @@ const DishAvailabilityTab = () => {
         <p className="mt-1 text-sm text-neutral-500">Set when this dish is available for different meal periods.</p>
       </div>
 
-      {!canViewAvailability ? (
-        <div className="flex items-center justify-center min-h-96">
-          <div className="text-center">
-            <h3 className="text-lg font-medium text-neutral-900 mb-2">Access Denied</h3>
-            <p className="text-neutral-500">You don't have permission to access dish availability.</p>
-          </div>
-        </div>
-      ) : (
+      {
         <div className="bg-white rounded-xl border border-neutral-200 overflow-hidden">
           <div className="overflow-x-auto">
             <table className="min-w-full divide-y divide-neutral-200">
@@ -240,36 +355,60 @@ const DishAvailabilityTab = () => {
                       <td key={slot.id} className="px-6 py-4">
                         {(() => {
                           const availability = getAvailabilityForDaySlot(day.id, slot.id);
-                          if (availability?.isAvailable) {
-                            const start = availability.customStartTime || slot.defaultStart;
-                            const end = availability.customEndTime || slot.defaultEnd;
-                            return (
-                              <div className="bg-green-50 text-center p-3 rounded-md border border-green-200 relative group">
-                                <div className="flex items-center justify-center">
-                                  <CheckCircleIcon className="h-4 w-4 text-green-500 mr-1" />
-                                  <span className="text-sm font-medium text-green-700">Available</span>
-                                </div>
-                                <div className="text-xs text-green-600 mt-1">{formatTime(start)} - {formatTime(end)}</div>
-                                <button
-                                  onClick={(e) => { e.stopPropagation(); handleEditTimeSlot(day, slot); }}
-                                  className="absolute top-1 right-1 opacity-0 group-hover:opacity-100 transition-opacity p-1 rounded-full bg-white shadow-sm border border-green-200 hover:bg-green-50"
-                                  title="Edit availability"
-                                >
-                                  <PencilIcon className="h-3 w-3 text-green-600" />
-                                </button>
-                              </div>
-                            );
-                          }
+                          const kitchenOpen = isKitchenOpen(day.id, slot.id);
+
                           return (
-                            <div className="text-center p-3 rounded-md border border-neutral-200 relative group">
-                              <div className="text-sm font-medium text-neutral-500">Not Available</div>
-                              <button
-                                onClick={(e) => { e.stopPropagation(); handleEditTimeSlot(day, slot); }}
-                                className="absolute top-1 right-1 opacity-0 group-hover:opacity-100 transition-opacity p-1 rounded-full bg-white shadow-sm border border-neutral-300 hover:bg-neutral-50"
-                                title="Set availability"
-                              >
-                                <PencilIcon className="h-3 w-3 text-neutral-600" />
-                              </button>
+                            <div>
+                              {kitchenOpen && canEditDishAvailability && (
+                                <div className="flex items-center mb-2">
+                                  <input
+                                    type="checkbox"
+                                    className="h-4 w-4 text-primary-600 border-neutral-300 rounded focus:ring-primary-500"
+                                    checked={isDishAvailableForSlot(day.id, slot.id)}
+                                    onChange={(e) => { e.stopPropagation(); handleEditTimeSlot(day, slot); }}
+                                    aria-label={`Toggle availability for ${day.name} - ${slot.label}`}
+                                  />
+                                  <span className="ml-2 text-xs text-neutral-600">Enable</span>
+                                </div>
+                              )}
+
+                              {availability?.isAvailable ? (
+                                (() => {
+                                  const start = availability.customStartTime || slot.defaultStart;
+                                  const end = availability.customEndTime || slot.defaultEnd;
+                                  return (
+                                    <div className="bg-green-50 text-center p-3 rounded-md border border-green-200 relative group">
+                                      <div className="flex items-center justify-center">
+                                        <CheckCircleIcon className="h-4 w-4 text-green-500 mr-1" />
+                                        <span className="text-sm font-medium text-green-700">Available</span>
+                                      </div>
+                                      <div className="text-xs text-green-600 mt-1">{formatTime(start)} - {formatTime(end)}</div>
+                                      {kitchenOpen && canEditDishAvailability && (
+                                        <button
+                                          onClick={(e) => { e.stopPropagation(); handleEditTimeSlot(day, slot); }}
+                                          className="absolute top-1 right-1 opacity-0 group-hover:opacity-100 transition-opacity p-1 rounded-full bg-white shadow-sm border border-green-200 hover:bg-green-50"
+                                          title="Edit availability"
+                                        >
+                                          <PencilIcon className="h-3 w-3 text-green-600" />
+                                        </button>
+                                      )}
+                                    </div>
+                                  );
+                                })()
+                              ) : (
+                                <div className={`text-center p-3 rounded-md border relative group ${kitchenOpen ? 'border-neutral-200' : 'border-neutral-200 bg-neutral-50'}`}>
+                                  <div className="text-sm font-medium text-neutral-500">{kitchenOpen ? 'Not Available' : 'Kitchen Closed'}</div>
+                                  {kitchenOpen && canEditDishAvailability && (
+                                    <button
+                                      onClick={(e) => { e.stopPropagation(); handleEditTimeSlot(day, slot); }}
+                                      className="absolute top-1 right-1 opacity-0 group-hover:opacity-100 transition-opacity p-1 rounded-full bg-white shadow-sm border border-neutral-300 hover:bg-neutral-50"
+                                      title="Set availability"
+                                    >
+                                      <PencilIcon className="h-3 w-3 text-neutral-600" />
+                                    </button>
+                                  )}
+                                </div>
+                              )}
                             </div>
                           );
                         })()}
@@ -281,7 +420,7 @@ const DishAvailabilityTab = () => {
             </table>
           </div>
         </div>
-      )}
+      }
 
       {/* Edit Time Slot Modal */}
       {showEditModal && (
@@ -310,32 +449,7 @@ const DishAvailabilityTab = () => {
                     </div>
                   </label>
                 </div>
-                {formData.isAvailable && (
-                  <div className="grid grid-cols-2 gap-4">
-                    <div>
-                      <label className="block text-sm font-medium text-neutral-700 mb-1">Start Time</label>
-                      <input
-                        type="time"
-                        name="startTime"
-                        value={formData.startTime}
-                        onChange={handleFormChange}
-                        className={`w-full p-3 border rounded-lg focus:ring-2 ${timeErrors.startTime ? 'border-red-300 focus:ring-red-500' : 'border-neutral-300 focus:ring-primary-500'}`}
-                      />
-                      {timeErrors.startTime && <p className="mt-1 text-xs text-red-600">{timeErrors.startTime}</p>}
-                    </div>
-                    <div>
-                      <label className="block text-sm font-medium text-neutral-700 mb-1">End Time</label>
-                      <input
-                        type="time"
-                        name="endTime"
-                        value={formData.endTime}
-                        onChange={handleFormChange}
-                        className={`w-full p-3 border rounded-lg focus:ring-2 ${timeErrors.endTime ? 'border-red-300 focus:ring-red-500' : 'border-neutral-300 focus:ring-primary-500'}`}
-                      />
-                      {timeErrors.endTime && <p className="mt-1 text-xs text-red-600">{timeErrors.endTime}</p>}
-                    </div>
-                  </div>
-                )}
+                {/* Custom time selection is disabled for Dish Availability; it follows kitchen availability */}
               </div>
               <div className="flex justify-end space-x-3 mt-6">
                 <button onClick={() => setShowEditModal(false)} className="px-4 py-2 bg-white border border-neutral-300 text-neutral-700 rounded-full hover:bg-neutral-50 text-sm font-medium">Cancel</button>
@@ -353,6 +467,7 @@ const DishAvailabilityTab = () => {
         title={dialogueBox.title}
         message={dialogueBox.message}
       />
+
     </div>
   );
 };

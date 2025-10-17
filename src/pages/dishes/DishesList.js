@@ -5,14 +5,17 @@ import { useAuth } from '../../hooks/useAuth';
 import { PERMISSIONS } from '../../contexts/PermissionRegistry';
 import AddDishModal from '../../components/AddDishModal';
 import DialogueBox from '../../components/DialogueBox';
+import { useGetAllDishesQuery } from '../../store/api/modules/dishes/dishesApi';
+import { skipToken } from '@reduxjs/toolkit/query';
 
 const DishesList = () => {
   const navigate = useNavigate();
   const { hasPermission } = useAuth();
   
   // Check permissions - simplified to only use admin.dish.view
-  const canViewDishes = hasPermission(PERMISSIONS.DISH_VIEW);
-  const canAddDish = hasPermission(PERMISSIONS.DISH_VIEW); // Using same permission for now
+  const canViewDishes = hasPermission(PERMISSIONS.DISH_LIST_VIEW);
+  const canAddDish = hasPermission(PERMISSIONS.DISH_CREATE);
+  const canViewDishDetail = hasPermission(PERMISSIONS.DISH_DETAIL_VIEW);
   
   // State variables
   const [dishes, setDishes] = useState([]);
@@ -49,67 +52,44 @@ const DishesList = () => {
     });
   };
 
-  // Mock data - replace with RTK Query later
+  // Fetch all dishes when permitted
+  const { data: allDishesResp, isLoading: isAllDishesLoading } = useGetAllDishesQuery(
+    canViewDishes ? { page: 1, limit: 50 } : skipToken
+  );
+
   useEffect(() => {
-    const loadDishes = () => {
+    if (isAllDishesLoading) {
       setIsLoading(true);
-      
-      // Mock kitchens data
-      const mockKitchens = [
-        { id: 1, name: 'Spice Garden Kitchen' },
-        { id: 2, name: 'Urban Bites' },
-        { id: 3, name: 'Healthy Harvest' }
-      ];
-      
-      // Mock dishes data
-      const mockDishes = [
-        {
-          id: 1,
-          dishName: 'Chicken Biryani',
-          story: 'Traditional aromatic rice dish',
-          description: 'Fragrant basmati rice cooked with tender chicken and aromatic spices',
-          kitchenId: 1,
-          kitchenName: 'Spice Garden Kitchen',
-          status: 'active',
-          createdAt: '2024-01-15T10:30:00Z'
-        },
-        {
-          id: 2,
-          dishName: 'Margherita Pizza',
-          story: 'Classic Italian favorite',
-          description: 'Fresh mozzarella, tomato sauce, and basil on crispy crust',
-          kitchenId: 2,
-          kitchenName: 'Urban Bites',
-          status: 'active',
-          createdAt: '2024-01-16T14:20:00Z'
-        },
-        {
-          id: 3,
-          dishName: 'Quinoa Salad Bowl',
-          story: 'Nutritious and delicious',
-          description: 'Fresh quinoa with mixed vegetables, nuts, and tahini dressing',
-          kitchenId: 3,
-          kitchenName: 'Healthy Harvest',
-          status: 'active',
-          createdAt: '2024-01-17T09:15:00Z'
-        }
-      ];
-      
-      setKitchens(mockKitchens);
-      setDishes(mockDishes);
-      setIsLoading(false);
-    };
-    
-    if (canViewDishes) {
-      loadDishes();
+      return;
     }
-  }, [canViewDishes]);
+    setIsLoading(false);
+    if (allDishesResp) {
+      // New API shape: { success, code, message, data: [ { id, kitchen: { id, name }, name, story, ... } ] }
+      const list = Array.isArray(allDishesResp?.data)
+        ? allDishesResp.data
+        : Array.isArray(allDishesResp)
+          ? allDishesResp
+          : [];
+      setDishes(list);
+      // Derive kitchens list for filter from nested kitchen object
+      const uniqKitchens = Array.from(new Map(list
+        .filter(d => d.kitchen && d.kitchen.id)
+        .map(d => [d.kitchen.id, { id: d.kitchen.id, name: d.kitchen.name || d.kitchen.id }])
+      ).values());
+      setKitchens(uniqKitchens);
+    }
+  }, [allDishesResp, isAllDishesLoading]);
 
   // Filter dishes based on search term and selected kitchen
   const filteredDishes = dishes.filter(dish => {
-    const matchesSearch = dish.dishName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         dish.kitchenName.toLowerCase().includes(searchTerm.toLowerCase());
-    const matchesKitchen = !selectedKitchen || dish.kitchenId.toString() === selectedKitchen;
+    const name = dish.name || dish.dishName || '';
+    const kid = dish.kitchen && dish.kitchen.id ? String(dish.kitchen.id) : '';
+    const kname = dish.kitchen && dish.kitchen.name ? dish.kitchen.name : '';
+    const matchesSearch = name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                          kid.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                          kname.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                          (dish.story || '').toLowerCase().includes(searchTerm.toLowerCase());
+    const matchesKitchen = !selectedKitchen || kid === selectedKitchen;
     return matchesSearch && matchesKitchen;
   });
 
@@ -142,6 +122,10 @@ const DishesList = () => {
 
   // Handle view dish details
   const handleViewDish = (dish) => {
+    if (!canViewDishDetail) {
+      showDialogue('error', 'Access Denied', "You don't have permission to view dish details.");
+      return;
+    }
     navigate(`/dishes/${dish.id}`);
   };
 
@@ -211,7 +195,7 @@ const DishesList = () => {
         </div>
       </div>
 
-      {/* Dishes Table */}
+      {/* Dishes Table (permission: admin.dish.list.view) */}
       {!canViewDishes ? (
         <div className="flex items-center justify-center min-h-96">
           <div className="text-center">
@@ -237,21 +221,9 @@ const DishesList = () => {
               <table className="min-w-full divide-y divide-neutral-200">
                 <thead className="bg-neutral-50">
                   <tr>
-                    <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-neutral-500 uppercase tracking-wider">
-                      Kitchen Name
-                    </th>
-                    <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-neutral-500 uppercase tracking-wider">
-                      Dish Name
-                    </th>
-                    <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-neutral-500 uppercase tracking-wider">
-                      Story
-                    </th>
-                    <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-neutral-500 uppercase tracking-wider">
-                      Status
-                    </th>
-                    <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-neutral-500 uppercase tracking-wider">
-                      Created
-                    </th>
+                    <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-neutral-500 uppercase tracking-wider">Name</th>
+                    <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-neutral-500 uppercase tracking-wider">Kitchen</th>
+                    <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-neutral-500 uppercase tracking-wider">Story</th>
                     <th scope="col" className="px-6 py-3 text-right text-xs font-medium text-neutral-500 uppercase tracking-wider">
                       Actions
                     </th>
@@ -261,38 +233,32 @@ const DishesList = () => {
                   {filteredDishes.map((dish) => (
                     <tr key={dish.id} className="hover:bg-neutral-50">
                       <td className="px-6 py-4 whitespace-nowrap">
-                        <div className="text-sm font-medium text-neutral-900">
-                          {dish.kitchenName}
-                        </div>
+                        <div className="text-sm font-medium text-neutral-900">{dish.name || '-'}</div>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
-                        <div className="text-sm font-medium text-neutral-900">
-                          {dish.dishName}
-                        </div>
+                        <div className="text-sm text-neutral-900">{(dish.kitchen && dish.kitchen.name) || '-'}</div>
                       </td>
                       <td className="px-6 py-4">
-                        <div className="text-sm text-neutral-900 max-w-xs truncate">
-                          {dish.story || '-'}
-                        </div>
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
-                          {dish.status}
-                        </span>
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <div className="text-sm text-neutral-500">
-                          {formatDate(dish.createdAt)}
-                        </div>
+                        <div className="text-sm text-neutral-700 max-w-md truncate">{dish.story || '-'}</div>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                        <button
-                          onClick={() => handleViewDish(dish)}
-                          className="text-primary-600 hover:text-primary-900 transition-colors"
-                          title="View dish details"
-                        >
-                          <EyeIcon className="h-5 w-5" />
-                        </button>
+                        {canViewDishDetail ? (
+                          <button
+                            onClick={() => handleViewDish(dish)}
+                            className="text-primary-600 hover:text-primary-900 transition-colors"
+                            title="View dish details"
+                          >
+                            <EyeIcon className="h-5 w-5" />
+                          </button>
+                        ) : (
+                          <button
+                            onClick={() => handleViewDish(dish)}
+                            className="text-neutral-300 cursor-not-allowed"
+                            title="You don't have permission to view details"
+                          >
+                            <EyeIcon className="h-5 w-5" />
+                          </button>
+                        )}
                       </td>
                     </tr>
                   ))}
@@ -307,8 +273,10 @@ const DishesList = () => {
       <AddDishModal
         isOpen={showAddDishModal}
         onClose={() => setShowAddDishModal(false)}
-        onSave={handleSaveDish}
         kitchenId={selectedKitchen}
+        onDishAdded={() => {
+          showDialogue('success', 'Dish Added', 'Dish has been added successfully!');
+        }}
       />
 
       {/* DialogueBox for feedback */}
