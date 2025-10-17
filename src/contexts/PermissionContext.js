@@ -1,4 +1,5 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
+import { useAuth } from '../hooks/useAuth';
 import { useGetPermissionsByUserIdQuery } from '../store/api/modules/users/usersApi';
 
 // Decryption utility (same as AuthContext)
@@ -18,6 +19,7 @@ export const PermissionProvider = ({ children }) => {
   const [permissionKeys, setPermissionKeys] = useState([]);
   const [isPermissionsLoaded, setIsPermissionsLoaded] = useState(false);
   const [userId, setUserId] = useState(null);
+  const { currentUser, isAuthenticated } = useAuth();
 
   // Clear permissions on logout
   const clearPermissions = React.useCallback(() => {
@@ -40,9 +42,12 @@ export const PermissionProvider = ({ children }) => {
           const userData = decryptData(encryptedUserData);
           // console.log('PermissionContext: Decrypted user data:', userData);
           
-          if (userData && userData.id) {
-            // console.log('PermissionContext: Setting userId:', userData.id);
-            setUserId(userData.id);
+          if (userData) {
+            const extractedId = userData.id || userData.userId || userData.user?.id || userData.profile?.id;
+            if (extractedId) {
+              // console.log('PermissionContext: Setting userId:', extractedId);
+              setUserId(extractedId);
+            }
             
             // Check if permissions were already loaded during login
             if (userData.fetchedPermissions && userData.permissionKeys) {
@@ -52,13 +57,24 @@ export const PermissionProvider = ({ children }) => {
               setIsPermissionsLoaded(true);
             }
           } else {
-            console.log('PermissionContext: No user ID found in userData');
+            // Fall back to AuthContext currentUser if available
+            const fallbackId = currentUser?.id || currentUser?.userId || currentUser?.user?.id;
+            if (fallbackId) {
+              setUserId(fallbackId);
+            } else {
+              console.log('PermissionContext: No user ID found in userData');
+            }
           }
         } else {
           console.log('PermissionContext: No encrypted user data found in sessionStorage');
-          // If no user data in session storage, clear permissions (user logged out)
-          if (userId || userPermissions.length > 0 || isPermissionsLoaded) {
-            clearPermissions();
+          // If authenticated but session storage not yet populated, try AuthContext
+          if (isAuthenticated && currentUser?.id) {
+            setUserId(currentUser.id);
+          } else {
+            // If no user data in session storage, clear permissions (user logged out)
+            if (userId || userPermissions.length > 0 || isPermissionsLoaded) {
+              clearPermissions();
+            }
           }
         }
       } catch (error) {
@@ -78,7 +94,7 @@ export const PermissionProvider = ({ children }) => {
     }, 1000); // Check every second
 
     return () => clearInterval(checkInterval);
-  }, []); // Remove dependencies to prevent infinite loop
+  }, [isAuthenticated, currentUser]); // react to auth changes
 
   // Fetch user permissions when userId is available
   const { 
@@ -100,15 +116,32 @@ export const PermissionProvider = ({ children }) => {
 
   // Update permissions when data is fetched
   useEffect(() => {
+    // On successful fetch
     if (permissionsData?.data?.permissions) {
-      const permissions = permissionsData.data.permissions;
+      const permissions = permissionsData.data.permissions || [];
       const keys = permissions.map(permission => permission.key);
-      
       setUserPermissions(permissions);
       setPermissionKeys(keys);
       setIsPermissionsLoaded(true);
+      return;
     }
-  }, [permissionsData]);
+
+    // If finished loading without data, consider it loaded with empty permissions
+    if (!isLoadingPermissions && userId && !permissionsData && !permissionsError) {
+      setUserPermissions([]);
+      setPermissionKeys([]);
+      setIsPermissionsLoaded(true);
+      return;
+    }
+
+    // If error occurred, mark as loaded with empty permissions to avoid blocking UI
+    if (permissionsError) {
+      console.error('PermissionContext: permissions fetch error:', permissionsError);
+      setUserPermissions([]);
+      setPermissionKeys([]);
+      setIsPermissionsLoaded(true);
+    }
+  }, [permissionsData, isLoadingPermissions, permissionsError, userId]);
 
   // Permission checking functions
   const hasPermission = (permissionKey) => {

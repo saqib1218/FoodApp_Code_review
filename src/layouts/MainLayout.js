@@ -29,7 +29,7 @@ const MainLayout = () => {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [showActionButtons, setShowActionButtons] = useState(false);
   const { currentUser, logout } = useAuth();
-  const { hasPermission, isPermissionsLoaded, navigation: permissionNavigation } = usePermissions();
+  const { hasPermission, isPermissionsLoaded } = usePermissions();
   const navigate = useNavigate();
   const location = useLocation();
 
@@ -71,10 +71,20 @@ const MainLayout = () => {
     { name: 'Settings', href: '/settings', icon: Cog6ToothIcon, permission: 'admin.setting.view' },
   ];
 
-  // Filter navigation items based on permissions
-  const filteredNavigation = navigation.filter(item => 
-    !item.permission || (isPermissionsLoaded && hasPermission(item.permission))
-  );
+  // While permissions are loading, block rendering the entire layout to avoid flicker/missing tabs
+  if (!isPermissionsLoaded) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-background-offWhite">
+        <div className="flex flex-col items-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary-600"></div>
+          <p className="mt-4 text-neutral-600">Loading permissions...</p>
+        </div>
+      </div>
+    );
+  }
+
+  // Filter navigation items based on permissions (runs only after permissions loaded)
+  const filteredNavigation = navigation.filter(item => !item.permission || hasPermission(item.permission));
 
   return (
     <div className="h-screen flex overflow-hidden bg-background-offWhite">
