@@ -1,4 +1,6 @@
 import React, { useMemo, useState } from 'react';
+import { PencilIcon } from '@heroicons/react/24/outline';
+import ConfirmationModal from '../../../../components/ConfirmationModal';
 
 const ALL_DAYS = [
   { key: 'Mon', label: 'Mon' },
@@ -26,7 +28,10 @@ const EligibilityRuleTab = () => {
   const [showModal, setShowModal] = useState(false);
   const [form, setForm] = useState(emptyForm);
   const [blackoutCandidate, setBlackoutCandidate] = useState('');
-  const [rules, setRules] = useState([]);
+  // Single rule mode: either null or an object
+  const [rule, setRule] = useState(null);
+  const [showConfirm, setShowConfirm] = useState(false);
+  const [confirmComment, setConfirmComment] = useState('');
 
   const canSave = useMemo(() => {
     // Minimal validation: require at least one of the numeric fields and proper time window if any time is provided
@@ -63,13 +68,7 @@ const EligibilityRuleTab = () => {
   const handleSave = () => {
     if (!canSave) return;
     // Store a copy; in the future wire to backend
-    setRules((prev) => [
-      ...prev,
-      {
-        ...form,
-        id: Date.now(),
-      },
-    ]);
+    setRule({ ...form, id: Date.now() });
     setForm(emptyForm);
     setBlackoutCandidate('');
     setShowModal(false);
@@ -81,62 +80,96 @@ const EligibilityRuleTab = () => {
     setShowModal(false);
   };
 
-  const removeRule = (id) => setRules((prev) => prev.filter((r) => r.id !== id));
+  const openAdd = () => {
+    setForm(emptyForm);
+    setBlackoutCandidate('');
+    setShowModal(true);
+  };
+  const openEdit = () => {
+    if (!rule) return;
+    setForm({
+      minOrderMinor: rule.minOrderMinor || '',
+      minItems: rule.minItems || '',
+      daysOfWeek: rule.daysOfWeek || [],
+      windowStartLocal: rule.windowStartLocal || '',
+      windowEndLocal: rule.windowEndLocal || '',
+      preorderLeadHours: rule.preorderLeadHours || '',
+      blackoutDates: rule.blackoutDates || [],
+      note: rule.note || '',
+      maxDiscountPercent: rule.maxDiscountPercent || '',
+    });
+    setBlackoutCandidate('');
+    setShowModal(true);
+  };
 
   return (
     <div>
       <div className="flex items-center justify-between mb-4">
-        <h3 className="text-lg font-medium text-neutral-900">Eligibility Rules</h3>
-        <button
-          onClick={() => setShowModal(true)}
-          className="px-4 py-2 bg-primary-600 text-white rounded-full hover:bg-primary-700 text-sm font-medium"
-        >
-          Add Eligibility Rule
-        </button>
+        <h3 className="text-lg font-medium text-neutral-900">Eligibility Rule</h3>
+        {!rule && (
+          <button
+            onClick={openAdd}
+            className="px-4 py-2 bg-primary-600 text-white rounded-full hover:bg-primary-700 text-sm font-medium"
+          >
+            Add Eligibility Rule
+          </button>
+        )}
+        {rule && (
+          <button
+            onClick={openEdit}
+            className="p-2 border border-neutral-300 rounded-full text-neutral-700 hover:bg-neutral-50"
+            title="Edit"
+            aria-label="Edit eligibility rule"
+          >
+            <PencilIcon className="h-4 w-4" />
+          </button>
+        )}
       </div>
 
-      <div className="bg-white rounded-lg border border-neutral-200 overflow-hidden">
-        <div className="overflow-x-auto">
-          <table className="min-w-full divide-y divide-neutral-200">
-            <thead className="bg-neutral-50">
-              <tr>
-                <th className="px-6 py-3 text-left text-xs font-medium text-neutral-500 uppercase tracking-wider">Summary</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-neutral-500 uppercase tracking-wider">Days</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-neutral-500 uppercase tracking-wider">Time Window</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-neutral-500 uppercase tracking-wider">Preorder Lead (h)</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-neutral-500 uppercase tracking-wider">Blackout Dates</th>
-                <th className="px-6 py-3 text-right text-xs font-medium text-neutral-500 uppercase tracking-wider">Actions</th>
-              </tr>
-            </thead>
-            <tbody className="bg-white divide-y divide-neutral-200">
-              {rules.length === 0 && (
-                <tr>
-                  <td colSpan={6} className="px-6 py-6 text-sm text-neutral-500 text-center">No eligibility rules added yet.</td>
-                </tr>
-              )}
-              {rules.map((r) => (
-                <tr key={r.id}>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-neutral-900">
-                    <div className="space-y-1">
-                      <div>Min Order (minor): <span className="font-medium">{r.minOrderMinor || '-'}</span></div>
-                      <div>Min Items: <span className="font-medium">{r.minItems || '-'}</span></div>
-                      <div>Max Discount %: <span className="font-medium">{r.maxDiscountPercent || '-'}</span></div>
-                      <div>Note: <span className="font-medium">{r.note || '-'}</span></div>
-                    </div>
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-neutral-900">{r.daysOfWeek?.join(', ') || '-'}</td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-neutral-900">{r.windowStartLocal && r.windowEndLocal ? `${r.windowStartLocal} - ${r.windowEndLocal}` : '-'}</td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-neutral-900">{r.preorderLeadHours || '-'}</td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-neutral-900">{r.blackoutDates?.length ? r.blackoutDates.join(', ') : '-'}</td>
-                  <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                    <button onClick={() => removeRule(r.id)} className="text-red-600 hover:text-red-700">Remove</button>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+      {!rule && (
+        <div className="bg-white rounded-lg border border-neutral-200 p-6 text-sm text-neutral-500 text-center">
+          No eligibility rule added yet.
         </div>
-      </div>
+      )}
+
+      {rule && (
+        <div className="bg-white rounded-lg border border-neutral-200 p-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+              <div className="text-sm text-neutral-500">Min Order (minor)</div>
+              <div className="text-neutral-900 font-medium">{rule.minOrderMinor || '-'}</div>
+            </div>
+            <div>
+              <div className="text-sm text-neutral-500">Min Items</div>
+              <div className="text-neutral-900 font-medium">{rule.minItems || '-'}</div>
+            </div>
+            <div>
+              <div className="text-sm text-neutral-500">Max Discount %</div>
+              <div className="text-neutral-900 font-medium">{rule.maxDiscountPercent || '-'}</div>
+            </div>
+            <div>
+              <div className="text-sm text-neutral-500">Preorder Lead (h)</div>
+              <div className="text-neutral-900 font-medium">{rule.preorderLeadHours || '-'}</div>
+            </div>
+            <div className="md:col-span-2">
+              <div className="text-sm text-neutral-500">Days</div>
+              <div className="text-neutral-900 font-medium">{rule.daysOfWeek?.length ? rule.daysOfWeek.join(', ') : '-'}</div>
+            </div>
+            <div>
+              <div className="text-sm text-neutral-500">Time Window</div>
+              <div className="text-neutral-900 font-medium">{rule.windowStartLocal && rule.windowEndLocal ? `${rule.windowStartLocal} - ${rule.windowEndLocal}` : '-'}</div>
+            </div>
+            <div>
+              <div className="text-sm text-neutral-500">Blackout Dates</div>
+              <div className="text-neutral-900 font-medium">{rule.blackoutDates?.length ? rule.blackoutDates.join(', ') : '-'}</div>
+            </div>
+            <div className="md:col-span-2">
+              <div className="text-sm text-neutral-500">Note</div>
+              <div className="text-neutral-900 font-medium">{rule.note || '-'}</div>
+            </div>
+          </div>
+        </div>
+      )}
 
       {showModal && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
@@ -220,10 +253,25 @@ const EligibilityRuleTab = () => {
 
             <div className="flex justify-end gap-3 mt-6">
               <button onClick={handleCancel} className="px-4 py-2 bg-white border border-neutral-300 text-neutral-700 rounded-full hover:bg-neutral-50 text-sm font-medium">Cancel</button>
-              <button onClick={handleSave} disabled={!canSave} className={`px-4 py-2 rounded-full text-sm font-medium ${canSave ? 'bg-primary-600 text-white hover:bg-primary-700' : 'bg-neutral-300 text-neutral-600 cursor-not-allowed'}`}>Save</button>
+              <button onClick={() => setShowConfirm(true)} disabled={!canSave} className={`px-4 py-2 rounded-full text-sm font-medium ${canSave ? 'bg-primary-600 text-white hover:bg-primary-700' : 'bg-neutral-300 text-neutral-600 cursor-not-allowed'}`}>Save</button>
             </div>
           </div>
         </div>
+      )}
+
+      {showConfirm && (
+        <ConfirmationModal
+          isOpen={showConfirm}
+          title={rule ? 'Update Eligibility Rule' : 'Create Eligibility Rule'}
+          message={rule ? 'Are you sure you want to update this eligibility rule?' : 'Are you sure you want to create this eligibility rule?'}
+          comment={confirmComment}
+          onCommentChange={setConfirmComment}
+          onConfirm={() => { setShowConfirm(false); handleSave(); setConfirmComment(''); }}
+          onCancel={() => { setShowConfirm(false); setConfirmComment(''); }}
+          confirmButtonText={rule ? 'Update' : 'Create'}
+          confirmButtonColor="primary"
+          isCommentRequired={true}
+        />
       )}
     </div>
   );

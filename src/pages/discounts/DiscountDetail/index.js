@@ -2,10 +2,14 @@ import React, { useState } from 'react';
 import { Link, useParams, useNavigate } from 'react-router-dom';
 import { ArrowLeftIcon, PencilIcon, XMarkIcon } from '@heroicons/react/24/outline';
 import DialogueBox from '../../../components/DialogueBox';
+import ConfirmationModal from '../../../components/ConfirmationModal';
 import EligibilityRuleTab from './tabs/EligibilityRuleTab';
 import PromotionTargetTab from './tabs/PromotionTargetTab';
 import AudienceRuleTab from './tabs/AudienceRuleTab';
 import PromoCodeTab from './tabs/PromoCodeTab';
+import DiscountFinancialTab from './tabs/DiscountFinancialTab';
+import DiscountScheduleTab from './tabs/DiscountScheduleTab';
+import DiscountUsageTab from './tabs/DiscountUsageTab';
 
 const DiscountDetail = () => {
   const { id } = useParams();
@@ -28,13 +32,17 @@ const DiscountDetail = () => {
 
   const [activeTab, setActiveTab] = useState('eligibility');
   const [showEditModal, setShowEditModal] = useState(false);
-  const [editForm, setEditForm] = useState({ name: '', discountIdea: '', promotionType: 'standard' });
+  const [editForm, setEditForm] = useState({ nameDisplay: '', nameInternal: '', campaignLabel: '', promotionType: 'standard' });
+  const [showEditConfirm, setShowEditConfirm] = useState(false);
 
   const TABS = {
     eligibility: <EligibilityRuleTab />,
     targets: <PromotionTargetTab />,
     audience: <AudienceRuleTab />,
     promocodes: <PromoCodeTab />,
+    financial: <DiscountFinancialTab />,
+    schedule: <DiscountScheduleTab />,
+    usage: <DiscountUsageTab />,
   };
 
   const formatDate = (iso) => new Date(iso).toLocaleDateString();
@@ -56,8 +64,9 @@ const DiscountDetail = () => {
           <button
             onClick={() => {
               setEditForm({
-                name: discount.name || '',
-                discountIdea: discount.idea || '',
+                nameDisplay: discount.name || '',
+                nameInternal: discount.internalName || '',
+                campaignLabel: discount.campaignLabel || '',
                 promotionType: discount.type || 'standard',
               });
               setShowEditModal(true);
@@ -91,6 +100,9 @@ const DiscountDetail = () => {
           <button onClick={() => setActiveTab('targets')} className={`py-4 px-1 border-b-2 font-medium text-sm ${activeTab==='targets'?'border-primary-500 text-primary-600':'border-transparent text-neutral-500 hover:text-neutral-700 hover:border-neutral-300'}`}>Promotion Target</button>
           <button onClick={() => setActiveTab('audience')} className={`py-4 px-1 border-b-2 font-medium text-sm ${activeTab==='audience'?'border-primary-500 text-primary-600':'border-transparent text-neutral-500 hover:text-neutral-700 hover:border-neutral-300'}`}>Audience Rule</button>
           <button onClick={() => setActiveTab('promocodes')} className={`py-4 px-1 border-b-2 font-medium text-sm ${activeTab==='promocodes'?'border-primary-500 text-primary-600':'border-transparent text-neutral-500 hover:text-neutral-700 hover:border-neutral-300'}`}>Promo Codes</button>
+          <button onClick={() => setActiveTab('financial')} className={`py-4 px-1 border-b-2 font-medium text-sm ${activeTab==='financial'?'border-primary-500 text-primary-600':'border-transparent text-neutral-500 hover:text-neutral-700 hover:border-neutral-300'}`}>Discount Financial</button>
+          <button onClick={() => setActiveTab('schedule')} className={`py-4 px-1 border-b-2 font-medium text-sm ${activeTab==='schedule'?'border-primary-500 text-primary-600':'border-transparent text-neutral-500 hover:text-neutral-700 hover:border-neutral-300'}`}>Discount Schedule</button>
+          <button onClick={() => setActiveTab('usage')} className={`py-4 px-1 border-b-2 font-medium text-sm ${activeTab==='usage'?'border-primary-500 text-primary-600':'border-transparent text-neutral-500 hover:text-neutral-700 hover:border-neutral-300'}`}>Discount Usage</button>
         </nav>
       </div>
 
@@ -111,23 +123,33 @@ const DiscountDetail = () => {
             </div>
             <div className="space-y-4">
               <div>
-                <label className="block text-sm font-medium text-neutral-700 mb-1">Name *</label>
+                <label className="block text-sm font-medium text-neutral-700 mb-1">Name Display *</label>
                 <input
                   type="text"
-                  value={editForm.name}
-                  onChange={(e) => setEditForm({ ...editForm, name: e.target.value })}
+                  value={editForm.nameDisplay}
+                  onChange={(e) => setEditForm({ ...editForm, nameDisplay: e.target.value })}
                   className="w-full p-2 border border-neutral-300 rounded-lg"
-                  placeholder="Enter promotion name"
+                  placeholder="Enter display name"
                 />
               </div>
               <div>
-                <label className="block text-sm font-medium text-neutral-700 mb-1">Discount Idea</label>
-                <textarea
-                  rows={3}
-                  value={editForm.discountIdea}
-                  onChange={(e) => setEditForm({ ...editForm, discountIdea: e.target.value })}
+                <label className="block text-sm font-medium text-neutral-700 mb-1">Name Internal</label>
+                <input
+                  type="text"
+                  value={editForm.nameInternal}
+                  onChange={(e) => setEditForm({ ...editForm, nameInternal: e.target.value })}
                   className="w-full p-2 border border-neutral-300 rounded-lg"
-                  placeholder="Describe your promotion idea"
+                  placeholder="Internal reference name"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-neutral-700 mb-1">Campaign Label</label>
+                <input
+                  type="text"
+                  value={editForm.campaignLabel}
+                  onChange={(e) => setEditForm({ ...editForm, campaignLabel: e.target.value })}
+                  className="w-full p-2 border border-neutral-300 rounded-lg"
+                  placeholder="Label shown in campaign UI"
                 />
               </div>
               <div>
@@ -147,16 +169,7 @@ const DiscountDetail = () => {
             <div className="flex justify-end space-x-3 mt-6">
               <button onClick={() => setShowEditModal(false)} className="px-4 py-2 bg-white border border-neutral-300 text-neutral-700 rounded-full hover:bg-neutral-50 text-sm font-medium">Cancel</button>
               <button
-                onClick={() => {
-                  // locally update the detail header fields; wire to API later
-                  setDiscount((prev) => ({
-                    ...prev,
-                    name: editForm.name,
-                    idea: editForm.discountIdea,
-                    type: editForm.promotionType,
-                  }));
-                  setShowEditModal(false);
-                }}
+                onClick={() => setShowEditConfirm(true)}
                 className="px-4 py-2 bg-primary-600 text-white rounded-full hover:bg-primary-700 text-sm font-medium"
               >
                 Save
@@ -164,6 +177,30 @@ const DiscountDetail = () => {
             </div>
           </div>
         </div>
+      )}
+
+      {showEditConfirm && (
+        <ConfirmationModal
+          isOpen={showEditConfirm}
+          title="Update Promotion"
+          message="Are you sure you want to update this promotion?"
+          confirmText="Update"
+          cancelText="Cancel"
+          onConfirm={() => {
+            setShowEditConfirm(false);
+            // locally update the detail header fields; wire to API later
+            setDiscount((prev) => ({
+              ...prev,
+              name: editForm.nameDisplay || prev.name,
+              internalName: editForm.nameInternal,
+              campaignLabel: editForm.campaignLabel,
+              type: editForm.promotionType || prev.type,
+            }));
+            setShowEditModal(false);
+          }}
+          onCancel={() => setShowEditConfirm(false)}
+          isCommentRequired={false}
+        />
       )}
     </div>
   );

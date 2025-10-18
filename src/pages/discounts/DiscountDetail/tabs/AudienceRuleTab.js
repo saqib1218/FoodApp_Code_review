@@ -1,4 +1,5 @@
 import React, { useMemo, useState } from 'react';
+import ConfirmationModal from '../../../../components/ConfirmationModal';
 
 const emptyForm = {
   rule_type: 'customer',
@@ -11,6 +12,7 @@ const AudienceRuleTab = () => {
   const [showModal, setShowModal] = useState(false);
   const [rules, setRules] = useState([]);
   const [form, setForm] = useState(emptyForm);
+  const [showConfirm, setShowConfirm] = useState(false);
 
   const canSave = useMemo(() => {
     // ordinal can be optional; validate numeric fields if filled
@@ -140,10 +142,23 @@ const AudienceRuleTab = () => {
 
             <div className="flex justify-end gap-3 mt-6">
               <button onClick={handleCancel} className="px-4 py-2 bg-white border border-neutral-300 text-neutral-700 rounded-full hover:bg-neutral-50 text-sm font-medium">Cancel</button>
-              <button onClick={handleSave} disabled={!canSave} className={`px-4 py-2 rounded-full text-sm font-medium ${canSave ? 'bg-primary-600 text-white hover:bg-primary-700' : 'bg-neutral-300 text-neutral-600 cursor-not-allowed'}`}>Save</button>
+              <button onClick={() => setShowConfirm(true)} disabled={!canSave} className={`px-4 py-2 rounded-full text-sm font-medium ${canSave ? 'bg-primary-600 text-white hover:bg-primary-700' : 'bg-neutral-300 text-neutral-600 cursor-not-allowed'}`}>Save</button>
             </div>
           </div>
         </div>
+      )}
+
+      {showConfirm && (
+        <ConfirmationModal
+          isOpen={showConfirm}
+          title="Create Audience Rule"
+          message="Are you sure you want to create this audience rule?"
+          isCommentRequired={false}
+          confirmText="Create"
+          cancelText="Cancel"
+          onConfirm={() => { setShowConfirm(false); handleSave(); }}
+          onCancel={() => setShowConfirm(false)}
+        />
       )}
     </div>
   );

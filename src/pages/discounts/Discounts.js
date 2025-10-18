@@ -1,6 +1,6 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { PlusIcon, PencilIcon, EyeIcon, XMarkIcon, TrashIcon } from '@heroicons/react/24/outline';
+import { PlusIcon, EyeIcon, XMarkIcon, MagnifyingGlassIcon, FunnelIcon } from '@heroicons/react/24/outline';
 import ConfirmationModal from '../../components/ConfirmationModal';
 
 const Discounts = () => {
@@ -49,8 +49,9 @@ const Discounts = () => {
   // Simplified create promotion modal state
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [createForm, setCreateForm] = useState({
-    name: '',
-    discountIdea: '',
+    nameDisplay: '',
+    nameInternal: '',
+    campaignLabel: '',
     promotionType: 'standard',
   });
   const [editingId, setEditingId] = useState(null);
@@ -59,44 +60,111 @@ const Discounts = () => {
   const [showConfirmationModal, setShowConfirmationModal] = useState(false);
   const [pendingAction, setPendingAction] = useState(null);
   const [confirmationComment, setConfirmationComment] = useState('');
+  const [showCreateConfirm, setShowCreateConfirm] = useState(false);
+
+  // Search and Filters
+  const [searchText, setSearchText] = useState('');
+  const [showFilters, setShowFilters] = useState(false);
+  const defaultFilters = {
+    kitchenName: '',
+    internalName: '',
+    status: 'all', // all | active | inactive | draft
+  };
+  const [filters, setFilters] = useState(defaultFilters);
+  const [pendingFilters, setPendingFilters] = useState(defaultFilters);
+  const applyFiltersNow = () => {
+    setFilters({ ...pendingFilters });
+  };
+  const resetFilters = () => {
+    setPendingFilters(defaultFilters);
+    setFilters(defaultFilters);
+    setSearchText('');
+    setStatusHeaderToggle(null);
+    setSort({ key: 'createdAt', direction: 'desc' });
+  };
+
+  // Sorting: default by createdAt desc (latest first)
+  const [sort, setSort] = useState({ key: 'createdAt', direction: 'desc' });
+  // Status header toggle (cycles active <-> inactive)
+  const [statusHeaderToggle, setStatusHeaderToggle] = useState(null); // null | 'active' | 'inactive'
 
   const handleCreatePromotion = () => {
     setEditingId(null);
-    setCreateForm({ name: '', discountIdea: '', promotionType: 'standard' });
+    setCreateForm({ nameDisplay: '', nameInternal: '', campaignLabel: '', promotionType: 'standard' });
     setShowCreateModal(true);
   };
 
+  // Derived: filtered list
+  const baseFiltered = discounts.filter((d) => {
+    // Search by Discount Name
+    const matchesSearch = !searchText || (d.name || '').toLowerCase().includes(searchText.toLowerCase());
+    // Filter by Kitchen Name (if present on object)
+    const matchesKitchen = !filters.kitchenName || (d.kitchenName || '').toLowerCase().includes(filters.kitchenName.toLowerCase());
+    // Filter by Internal Name (map to idea/description as internal name surrogate)
+    const internal = (d.internalName || d.idea || d.description || '');
+    const matchesInternal = !filters.internalName || internal.toLowerCase().includes(filters.internalName.toLowerCase());
+    // Status filter
+    const matchesStatus = filters.status === 'all' || (d.status || '').toLowerCase() === filters.status.toLowerCase();
+    return matchesSearch && matchesKitchen && matchesInternal && matchesStatus;
+  });
+
+  // Apply header status toggle filter if set
+  const headerStatusFiltered = useMemo(() => {
+    if (!statusHeaderToggle) return baseFiltered;
+    return baseFiltered.filter(d => (d.status || '').toLowerCase() === statusHeaderToggle);
+  }, [baseFiltered, statusHeaderToggle]);
+
+  // Normalize createdAt value (fallback to startDate or id timestamp)
+  const getCreatedAt = (d) => {
+    if (d.createdAt) return new Date(d.createdAt).getTime();
+    if (d.startDate) return new Date(d.startDate).getTime();
+    return Number(d.id) || 0;
+  };
+
+  const filteredDiscounts = useMemo(() => {
+    const arr = [...headerStatusFiltered];
+    if (sort.key === 'createdAt') {
+      arr.sort((a, b) => {
+        const av = getCreatedAt(a);
+        const bv = getCreatedAt(b);
+        return sort.direction === 'asc' ? av - bv : bv - av;
+      });
+    }
+    return arr;
+  }, [headerStatusFiltered, sort]);
+
   const handleSavePromotion = () => {
-    if (!createForm.name.trim()) return;
+    if (!createForm.nameDisplay.trim()) return;
     if (editingId) {
       setDiscounts(prev => prev.map(d => d.id === editingId ? {
         ...d,
-        name: createForm.name,
-        idea: createForm.discountIdea,
-        description: createForm.discountIdea,
+        name: createForm.nameDisplay,
+        internalName: createForm.nameInternal,
+        campaignLabel: createForm.campaignLabel,
         type: createForm.promotionType,
       } : d));
     } else {
       const newPromotion = {
         id: Date.now(),
-        name: createForm.name,
-        idea: createForm.discountIdea,
+        name: createForm.nameDisplay,
+        internalName: createForm.nameInternal,
+        campaignLabel: createForm.campaignLabel,
         type: createForm.promotionType,
         status: 'draft',
         startDate: new Date().toISOString(),
         endDate: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(),
-        description: createForm.discountIdea,
+        description: createForm.campaignLabel,
       };
       setDiscounts(prev => [newPromotion, ...prev]);
     }
-    setCreateForm({ name: '', discountIdea: '', promotionType: 'standard' });
+    setCreateForm({ nameDisplay: '', nameInternal: '', campaignLabel: '', promotionType: 'standard' });
     setEditingId(null);
     setShowCreateModal(false);
   };
 
   const handleCancelPromotion = () => {
     setShowCreateModal(false);
-    setCreateForm({ name: '', discountIdea: '', promotionType: 'standard' });
+    setCreateForm({ nameDisplay: '', nameInternal: '', campaignLabel: '', promotionType: 'standard' });
     setEditingId(null);
   };
 
@@ -164,32 +232,150 @@ const Discounts = () => {
         <p className="mt-1 text-sm text-gray-500">Manage discounts, offers, and promotional codes</p>
       </div>
 
-      {/* Create Promotion Button */}
-      <div className="mb-6 flex justify-end">
-        <button
-          onClick={handleCreatePromotion}
-          className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-primary-600 hover:bg-primary-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500"
-        >
-          <PlusIcon className="-ml-1 mr-2 h-4 w-4" />
-          Create Promotion
-        </button>
+      {/* Toolbar: Create above, then Search + Filters */}
+      <div className="mb-6 flex flex-col gap-3">
+        {/* Create button row */}
+        <div className="flex items-center justify-end">
+          <button
+            onClick={handleCreatePromotion}
+            className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-primary-600 hover:bg-primary-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500"
+          >
+            <PlusIcon className="-ml-1 mr-2 h-4 w-4" />
+            Create Promotion
+          </button>
+        </div>
+        {/* Search + Filters row */}
+        <div className="flex flex-col md:flex-row md:items-end md:justify-between gap-3">
+          {/* Search */}
+          <div className="flex-1">
+            <label className="block text-sm font-medium text-neutral-700 mb-1">Discount Name</label>
+            <div className="relative">
+              <MagnifyingGlassIcon className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-neutral-400" />
+              <input
+                type="text"
+                value={searchText}
+                onChange={(e) => setSearchText(e.target.value)}
+                className="w-full pl-10 pr-3 py-2 border border-neutral-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
+                placeholder="Search by discount name"
+              />
+            </div>
+          </div>
+          <div className="flex items-end gap-3">
+            <button
+              type="button"
+              onClick={() => setShowFilters((prev) => !prev)}
+              className="inline-flex items-center px-4 py-2 border border-neutral-300 text-sm font-medium rounded-md bg-white hover:bg-neutral-50"
+            >
+              <FunnelIcon className="h-5 w-5 mr-2 text-neutral-500" />
+              Filters
+            </button>
+          </div>
+        </div>
+
+        {showFilters && (
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 bg-white border border-neutral-200 rounded-lg p-4">
+            <div>
+              <label className="block text-sm font-medium text-neutral-700 mb-1">Kitchen Name</label>
+              <input
+                type="text"
+                value={pendingFilters.kitchenName}
+                onChange={(e) => setPendingFilters({ ...pendingFilters, kitchenName: e.target.value })}
+                className="w-full p-2 border border-neutral-300 rounded-lg"
+                placeholder="e.g., Riwayat DHA"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-neutral-700 mb-1">Discount Internal Name</label>
+              <input
+                type="text"
+                value={pendingFilters.internalName}
+                onChange={(e) => setPendingFilters({ ...pendingFilters, internalName: e.target.value })}
+                className="w-full p-2 border border-neutral-300 rounded-lg"
+                placeholder="e.g., weekend_special_internal"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-neutral-700 mb-1">Status</label>
+              <select
+                value={pendingFilters.status}
+                onChange={(e) => setPendingFilters({ ...pendingFilters, status: e.target.value })}
+                className="w-full p-2 border border-neutral-300 rounded-lg"
+              >
+                <option value="all">All</option>
+                <option value="active">Active</option>
+                <option value="inactive">Inactive</option>
+                <option value="draft">Draft</option>
+              </select>
+            </div>
+            <div className="md:col-span-3 mt-2 flex items-center gap-3">
+              <button
+                onClick={applyFiltersNow}
+                className="px-4 py-2 bg-primary-600 text-white rounded-md hover:bg-primary-700 transition-colors text-sm"
+              >
+                Search
+              </button>
+              <button
+                onClick={resetFilters}
+                className="px-4 py-2 bg-white border border-neutral-300 text-neutral-700 rounded-md hover:bg-neutral-50 transition-colors text-sm"
+              >
+                Reset Filters
+              </button>
+            </div>
+          </div>
+        )}
       </div>
 
       {/* Discounts Table */}
-      <div className="bg-white shadow rounded-lg overflow-hidden">
+      <div className="bg-white shadow overflow-hidden rounded-lg">
         <div className="overflow-x-auto">
           <table className="min-w-full divide-y divide-gray-200">
             <thead className="bg-gray-50">
               <tr>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Name & Type</th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Value</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  <button
+                    type="button"
+                    onClick={() => setStatusHeaderToggle(prev => prev === 'active' ? 'inactive' : 'active')}
+                    className="inline-flex items-center gap-2 text-gray-600 hover:text-gray-900"
+                  >
+                    Status
+                    {statusHeaderToggle && (
+                      <span className={`text-xs px-2 py-0.5 rounded-full ${statusHeaderToggle==='active' ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>
+                        {statusHeaderToggle}
+                      </span>
+                    )}
+                  </button>
+                </th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  <button
+                    type="button"
+                    onClick={() => setSort(s => ({ key: 'createdAt', direction: s.direction === 'desc' ? 'asc' : 'desc' }))}
+                    className="inline-flex items-center gap-2 text-gray-600 hover:text-gray-900"
+                    title="Sort by Created At"
+                  >
+                    Created At
+                    <span className="text-xs text-gray-400">{sort.direction === 'desc' ? '(Latest)' : '(Oldest)'}</span>
+                  </button>
+                </th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Duration</th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
               </tr>
             </thead>
             <tbody className="bg-white divide-y divide-gray-200">
-              {discounts.map((discount) => (
+              {filteredDiscounts.length === 0 ? (
+                <tr>
+                  <td colSpan={5} className="p-6 text-center">
+                    <p className="text-neutral-500">No discounts found matching your criteria.</p>
+                    <button
+                      onClick={resetFilters}
+                      className="mt-2 text-primary-600 hover:text-primary-500"
+                    >
+                      Reset filters
+                    </button>
+                  </td>
+                </tr>
+              ) : filteredDiscounts.map((discount) => (
                 <tr key={discount.id} className="hover:bg-gray-50">
                   <td className="px-6 py-4 whitespace-nowrap">
                     <div>
@@ -208,39 +394,20 @@ const Discounts = () => {
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap">{getStatusBadge(discount.status)}</td>
                   <td className="px-6 py-4 whitespace-nowrap">
+                    <div className="text-sm text-gray-900">{new Date(getCreatedAt(discount)).toLocaleDateString()}</div>
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap">
                     <div className="text-sm text-gray-900">{new Date(discount.startDate).toLocaleDateString()}</div>
                     <div className="text-xs text-gray-500">to {new Date(discount.endDate).toLocaleDateString()}</div>
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
                     <div className="flex items-center space-x-3">
                       <button
-                        onClick={() => {
-                          setEditingId(discount.id);
-                          setCreateForm({
-                            name: discount.name || '',
-                            discountIdea: discount.idea || discount.description || '',
-                            promotionType: discount.type || 'standard',
-                          });
-                          setShowCreateModal(true);
-                        }}
-                        className="text-blue-600 hover:text-blue-900 transition-colors"
-                        title="Edit discount"
-                      >
-                        <PencilIcon className="h-4 w-4" />
-                      </button>
-                      <button
                         onClick={() => navigate(`/discounts/${discount.id}`)}
                         className="text-green-600 hover:text-green-900 transition-colors"
                         title="View discount"
                       >
                         <EyeIcon className="h-4 w-4" />
-                      </button>
-                      <button
-                        onClick={() => handleDeleteDiscount(discount.id)}
-                        className="text-red-600 hover:text-red-900 transition-colors"
-                        title="Delete discount"
-                      >
-                        <TrashIcon className="h-4 w-4" />
                       </button>
                     </div>
                   </td>
@@ -263,23 +430,33 @@ const Discounts = () => {
             </div>
             <div className="space-y-4">
               <div>
-                <label className="block text-sm font-medium text-neutral-700 mb-1">Name *</label>
+                <label className="block text-sm font-medium text-neutral-700 mb-1">Name Display *</label>
                 <input
                   type="text"
-                  value={createForm.name}
-                  onChange={(e) => setCreateForm({ ...createForm, name: e.target.value })}
+                  value={createForm.nameDisplay}
+                  onChange={(e) => setCreateForm({ ...createForm, nameDisplay: e.target.value })}
                   className="w-full p-2 border border-neutral-300 rounded-lg"
-                  placeholder="Enter promotion name"
+                  placeholder="Enter display name"
                 />
               </div>
               <div>
-                <label className="block text-sm font-medium text-neutral-700 mb-1">Discount Idea</label>
-                <textarea
-                  rows={3}
-                  value={createForm.discountIdea}
-                  onChange={(e) => setCreateForm({ ...createForm, discountIdea: e.target.value })}
+                <label className="block text-sm font-medium text-neutral-700 mb-1">Name Internal</label>
+                <input
+                  type="text"
+                  value={createForm.nameInternal}
+                  onChange={(e) => setCreateForm({ ...createForm, nameInternal: e.target.value })}
                   className="w-full p-2 border border-neutral-300 rounded-lg"
-                  placeholder="Describe your promotion idea"
+                  placeholder="Internal reference name"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-neutral-700 mb-1">Campaign Label</label>
+                <input
+                  type="text"
+                  value={createForm.campaignLabel}
+                  onChange={(e) => setCreateForm({ ...createForm, campaignLabel: e.target.value })}
+                  className="w-full p-2 border border-neutral-300 rounded-lg"
+                  placeholder="Label shown in campaign UI"
                 />
               </div>
               <div>
@@ -298,7 +475,7 @@ const Discounts = () => {
             </div>
             <div className="flex justify-end space-x-3 mt-6">
               <button onClick={handleCancelPromotion} className="px-4 py-2 bg-white border border-neutral-300 text-neutral-700 rounded-full hover:bg-neutral-50 text-sm font-medium">Cancel</button>
-              <button onClick={handleSavePromotion} className="px-4 py-2 bg-primary-600 text-white rounded-full hover:bg-primary-700 text-sm font-medium">Save</button>
+              <button onClick={() => setShowCreateConfirm(true)} className="px-4 py-2 bg-primary-600 text-white rounded-full hover:bg-primary-700 text-sm font-medium">Save</button>
             </div>
           </div>
         </div>
@@ -317,6 +494,20 @@ const Discounts = () => {
           comment={confirmationComment}
           onCommentChange={setConfirmationComment}
           variant="danger"
+        />
+      )}
+
+      {/* Create Promotion Confirmation */}
+      {showCreateConfirm && (
+        <ConfirmationModal
+          isOpen={showCreateConfirm}
+          title={editingId ? 'Update Promotion' : 'Create Promotion'}
+          message={editingId ? 'Are you sure you want to update this promotion?' : 'Are you sure you want to create this promotion?'}
+          onConfirm={() => { setShowCreateConfirm(false); handleSavePromotion(); }}
+          onCancel={() => setShowCreateConfirm(false)}
+          confirmButtonText={editingId ? 'Update' : 'Create'}
+          confirmButtonColor="primary"
+          isCommentRequired={false}
         />
       )}
     </div>
