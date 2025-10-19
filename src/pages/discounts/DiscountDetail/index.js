@@ -32,7 +32,7 @@ const DiscountDetail = () => {
 
   const [activeTab, setActiveTab] = useState('eligibility');
   const [showEditModal, setShowEditModal] = useState(false);
-  const [editForm, setEditForm] = useState({ nameDisplay: '', nameInternal: '', campaignLabel: '', promotionType: 'standard' });
+  const [editForm, setEditForm] = useState({ nameDisplay: '', nameInternal: '', campaignLabel: '', descriptionInternal: '', promotionType: 'standard' });
   const [showEditConfirm, setShowEditConfirm] = useState(false);
 
   const TABS = {
@@ -67,6 +67,7 @@ const DiscountDetail = () => {
                 nameDisplay: discount.name || '',
                 nameInternal: discount.internalName || '',
                 campaignLabel: discount.campaignLabel || '',
+                descriptionInternal: discount.internalDescription || '',
                 promotionType: discount.type || 'standard',
               });
               setShowEditModal(true);
@@ -83,12 +84,16 @@ const DiscountDetail = () => {
       <div className="px-6 py-5 border-b border-neutral-200 grid grid-cols-1 md:grid-cols-2 gap-6">
         <div>
           <div className="mb-2">
-            <h3 className="text-sm font-medium text-neutral-500">Promotion Idea</h3>
-            <p className="mt-1 text-neutral-900">{discount.idea || '-'}</p>
+            <h3 className="text-sm font-medium text-neutral-500">Name Internal</h3>
+            <p className="mt-1 text-neutral-900">{discount.internalName || '-'}</p>
           </div>
           <div className="mb-2">
-            <h3 className="text-sm font-medium text-neutral-500">Duration</h3>
-            <p className="mt-1 text-neutral-900">{formatDate(discount.startDate)} to {formatDate(discount.endDate)}</p>
+            <h3 className="text-sm font-medium text-neutral-500">Campaign Label</h3>
+            <p className="mt-1 text-neutral-900">{discount.campaignLabel || '-'}</p>
+          </div>
+          <div className="mb-2">
+            <h3 className="text-sm font-medium text-neutral-500">Description Internal</h3>
+            <p className="mt-1 text-neutral-900 whitespace-pre-line">{discount.internalDescription || '-'}</p>
           </div>
         </div>
       </div>
@@ -114,7 +119,7 @@ const DiscountDetail = () => {
 
       {showEditModal && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-xl shadow-lg max-w-md w-full p-6">
+          <div className="bg-white rounded-xl shadow-lg max-w-md w-full p-6 max-h-[90vh] overflow-y-auto">
             <div className="flex justify-between items-center mb-6">
               <h3 className="text-lg font-medium text-neutral-900">Edit Promotion</h3>
               <button onClick={() => setShowEditModal(false)} className="text-neutral-400 hover:text-neutral-600">
@@ -140,6 +145,16 @@ const DiscountDetail = () => {
                   onChange={(e) => setEditForm({ ...editForm, nameInternal: e.target.value })}
                   className="w-full p-2 border border-neutral-300 rounded-lg"
                   placeholder="Internal reference name"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-neutral-700 mb-1">Description Internal</label>
+                <textarea
+                  rows={3}
+                  value={editForm.descriptionInternal}
+                  onChange={(e) => setEditForm({ ...editForm, descriptionInternal: e.target.value })}
+                  className="w-full p-2 border border-neutral-300 rounded-lg"
+                  placeholder="Internal description (not shown to customers)"
                 />
               </div>
               <div>
@@ -194,6 +209,7 @@ const DiscountDetail = () => {
               name: editForm.nameDisplay || prev.name,
               internalName: editForm.nameInternal,
               campaignLabel: editForm.campaignLabel,
+              internalDescription: editForm.descriptionInternal,
               type: editForm.promotionType || prev.type,
             }));
             setShowEditModal(false);

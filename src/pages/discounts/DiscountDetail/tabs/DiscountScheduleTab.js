@@ -1,4 +1,5 @@
 import React, { useMemo, useState } from 'react';
+import { PencilIcon } from '@heroicons/react/24/outline';
 import ConfirmationModal from '../../../../components/ConfirmationModal';
 
 const emptyForm = { startDate: '', endDate: '', timeZone: 'Karachi' };
@@ -6,8 +7,9 @@ const emptyForm = { startDate: '', endDate: '', timeZone: 'Karachi' };
 export default function DiscountScheduleTab() {
   const [showModal, setShowModal] = useState(false);
   const [form, setForm] = useState(emptyForm);
-  const [schedules, setSchedules] = useState([]);
+  const [schedule, setSchedule] = useState(null);
   const [showConfirm, setShowConfirm] = useState(false);
+  const [confirmComment, setConfirmComment] = useState('');
 
   const canSave = useMemo(() => !!form.startDate && !!form.endDate, [form.startDate, form.endDate]);
 
@@ -15,16 +17,12 @@ export default function DiscountScheduleTab() {
 
   const handleSave = () => {
     if (!canSave) return;
-    setSchedules((prev) => [
-      {
-        id: Date.now(),
-        startDate: form.startDate,
-        endDate: form.endDate,
-        timeZone: form.timeZone,
-        createdAt: new Date().toISOString(),
-      },
-      ...prev,
-    ]);
+    setSchedule({
+      id: Date.now(),
+      startDate: form.startDate,
+      endDate: form.endDate,
+      timeZone: form.timeZone,
+    });
     reset();
     setShowModal(false);
   };
@@ -34,51 +32,66 @@ export default function DiscountScheduleTab() {
     setShowModal(false);
   };
 
-  const removeSchedule = (id) => setSchedules((prev) => prev.filter((s) => s.id !== id));
+  const openAdd = () => {
+    reset();
+    setShowModal(true);
+  };
+
+  const openEdit = () => {
+    if (!schedule) return;
+    setForm({
+      startDate: schedule.startDate || '',
+      endDate: schedule.endDate || '',
+      timeZone: schedule.timeZone || 'Karachi',
+    });
+    setShowModal(true);
+  };
 
   return (
     <div>
       <div className="flex items-center justify-between mb-4">
         <h3 className="text-lg font-medium text-neutral-900">Discount Schedule</h3>
-        <button
-          onClick={() => setShowModal(true)}
-          className="px-4 py-2 bg-primary-600 text-white rounded-full hover:bg-primary-700 text-sm font-medium"
-        >
-          Add Schedule
-        </button>
+        {!schedule ? (
+          <button
+            onClick={openAdd}
+            className="px-4 py-2 bg-primary-600 text-white rounded-full hover:bg-primary-700 text-sm font-medium"
+          >
+            Add Schedule
+          </button>
+        ) : (
+          <button
+            onClick={openEdit}
+            className="p-2 border border-neutral-300 rounded-full text-neutral-700 hover:bg-neutral-50"
+            title="Edit"
+            aria-label="Edit schedule"
+          >
+            <PencilIcon className="h-4 w-4" />
+          </button>
+        )}
       </div>
 
-      <div className="bg-white rounded-lg border border-neutral-200 overflow-hidden">
-        <div className="overflow-x-auto">
-          <table className="min-w-full divide-y divide-neutral-200">
-            <thead className="bg-neutral-50">
-              <tr>
-                <th className="px-6 py-3 text-left text-xs font-medium text-neutral-500 uppercase tracking-wider">Start Date</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-neutral-500 uppercase tracking-wider">End Date</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-neutral-500 uppercase tracking-wider">Time Zone</th>
-                <th className="px-6 py-3 text-right text-xs font-medium text-neutral-500 uppercase tracking-wider">Actions</th>
-              </tr>
-            </thead>
-            <tbody className="bg-white divide-y divide-neutral-200">
-              {schedules.length === 0 && (
-                <tr>
-                  <td colSpan={4} className="px-6 py-6 text-sm text-neutral-500 text-center">No schedules added yet.</td>
-                </tr>
-              )}
-              {schedules.map((s) => (
-                <tr key={s.id}>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-neutral-900">{new Date(s.startDate).toLocaleString()}</td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-neutral-900">{new Date(s.endDate).toLocaleString()}</td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-neutral-900">{s.timeZone}</td>
-                  <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                    <button onClick={() => removeSchedule(s.id)} className="text-red-600 hover:text-red-700">Remove</button>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+      {!schedule && (
+        <div className="bg-white rounded-lg border border-neutral-200 p-6 text-sm text-neutral-500 text-center">No schedules added yet.</div>
+      )}
+
+      {schedule && (
+        <div className="bg-white rounded-lg border border-neutral-200 p-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+              <div className="text-sm text-neutral-500">Start Date</div>
+              <div className="text-neutral-900 font-medium">{new Date(schedule.startDate).toLocaleString()}</div>
+            </div>
+            <div>
+              <div className="text-sm text-neutral-500">End Date</div>
+              <div className="text-neutral-900 font-medium">{new Date(schedule.endDate).toLocaleString()}</div>
+            </div>
+            <div>
+              <div className="text-sm text-neutral-500">Time Zone</div>
+              <div className="text-neutral-900 font-medium">{schedule.timeZone}</div>
+            </div>
+          </div>
         </div>
-      </div>
+      )}
 
       {showModal && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
@@ -126,14 +139,15 @@ export default function DiscountScheduleTab() {
       {showConfirm && (
         <ConfirmationModal
           isOpen={showConfirm}
-          title="Create Discount Schedule"
-          message="Are you sure you want to create this schedule?"
-          isCommentRequired={false}
-          confirmText="Create"
-          cancelText="Cancel"
-          onConfirm={() => { setShowConfirm(false); handleSave(); }}
-          onCancel={() => setShowConfirm(false)}
-          variant="primary"
+          title={schedule ? 'Update Discount Schedule' : 'Create Discount Schedule'}
+          message={schedule ? 'Are you sure you want to update this schedule?' : 'Are you sure you want to create this schedule?'}
+          comment={confirmComment}
+          onCommentChange={setConfirmComment}
+          onConfirm={() => { setShowConfirm(false); handleSave(); setConfirmComment(''); }}
+          onCancel={() => { setShowConfirm(false); setConfirmComment(''); }}
+          confirmButtonText={schedule ? 'Update' : 'Create'}
+          confirmButtonColor="primary"
+          isCommentRequired={true}
         />
       )}
     </div>

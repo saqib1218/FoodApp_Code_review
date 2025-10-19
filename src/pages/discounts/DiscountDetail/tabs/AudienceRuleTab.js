@@ -1,4 +1,5 @@
 import React, { useMemo, useState } from 'react';
+import { PencilIcon } from '@heroicons/react/24/outline';
 import ConfirmationModal from '../../../../components/ConfirmationModal';
 
 const emptyForm = {
@@ -10,9 +11,10 @@ const emptyForm = {
 
 const AudienceRuleTab = () => {
   const [showModal, setShowModal] = useState(false);
-  const [rules, setRules] = useState([]);
+  const [rule, setRule] = useState(null);
   const [form, setForm] = useState(emptyForm);
   const [showConfirm, setShowConfirm] = useState(false);
+  const [confirmComment, setConfirmComment] = useState('');
 
   const canSave = useMemo(() => {
     // ordinal can be optional; validate numeric fields if filled
@@ -26,13 +28,7 @@ const AudienceRuleTab = () => {
 
   const handleSave = () => {
     if (!canSave) return;
-    setRules((prev) => [
-      ...prev,
-      {
-        id: Date.now(),
-        ...form,
-      },
-    ]);
+    setRule({ id: Date.now(), ...form });
     reset();
     setShowModal(false);
   };
@@ -42,7 +38,21 @@ const AudienceRuleTab = () => {
     setShowModal(false);
   };
 
-  const removeRule = (id) => setRules((prev) => prev.filter((r) => r.id !== id));
+  const openAdd = () => {
+    reset();
+    setShowModal(true);
+  };
+
+  const openEdit = () => {
+    if (!rule) return;
+    setForm({
+      rule_type: rule.rule_type || 'customer',
+      min_orders: rule.min_orders ?? '',
+      max_orders: rule.max_orders ?? '',
+      ordinal: rule.ordinal ?? '',
+    });
+    setShowModal(true);
+  };
 
   const ruleTypeLabel = (v) => {
     switch (v) {
@@ -60,48 +70,54 @@ const AudienceRuleTab = () => {
   return (
     <div>
       <div className="flex items-center justify-between mb-4">
-        <h3 className="text-lg font-medium text-neutral-900">Audience Rules</h3>
-        <button
-          onClick={() => setShowModal(true)}
-          className="px-4 py-2 bg-primary-600 text-white rounded-full hover:bg-primary-700 text-sm font-medium"
-        >
-          Add Audience Rule
-        </button>
+        <h3 className="text-lg font-medium text-neutral-900">Audience Rule</h3>
+        {!rule ? (
+          <button
+            onClick={openAdd}
+            className="px-4 py-2 bg-primary-600 text-white rounded-full hover:bg-primary-700 text-sm font-medium"
+          >
+            Add Audience Rule
+          </button>
+        ) : (
+          <button
+            onClick={openEdit}
+            className="p-2 border border-neutral-300 rounded-full text-neutral-700 hover:bg-neutral-50"
+            title="Edit"
+            aria-label="Edit audience rule"
+          >
+            <PencilIcon className="h-4 w-4" />
+          </button>
+        )}
       </div>
 
-      <div className="bg-white rounded-lg border border-neutral-200 overflow-hidden">
-        <div className="overflow-x-auto">
-          <table className="min-w-full divide-y divide-neutral-200">
-            <thead className="bg-neutral-50">
-              <tr>
-                <th className="px-6 py-3 text-left text-xs font-medium text-neutral-500 uppercase tracking-wider">Rule Type</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-neutral-500 uppercase tracking-wider">Min Orders</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-neutral-500 uppercase tracking-wider">Max Orders</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-neutral-500 uppercase tracking-wider">Ordinal</th>
-                <th className="px-6 py-3 text-right text-xs font-medium text-neutral-500 uppercase tracking-wider">Actions</th>
-              </tr>
-            </thead>
-            <tbody className="bg-white divide-y divide-neutral-200">
-              {rules.length === 0 && (
-                <tr>
-                  <td colSpan={5} className="px-6 py-6 text-sm text-neutral-500 text-center">No audience rules added yet.</td>
-                </tr>
-              )}
-              {rules.map((r) => (
-                <tr key={r.id}>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-neutral-900">{ruleTypeLabel(r.rule_type)}</td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-neutral-900">{r.min_orders || '-'}</td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-neutral-900">{r.max_orders || '-'}</td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-neutral-900">{r.ordinal || '-'}</td>
-                  <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                    <button onClick={() => removeRule(r.id)} className="text-red-600 hover:text-red-700">Remove</button>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+      {!rule && (
+        <div className="bg-white rounded-lg border border-neutral-200 p-6 text-sm text-neutral-500 text-center">
+          No audience rule added yet.
         </div>
-      </div>
+      )}
+
+      {rule && (
+        <div className="bg-white rounded-lg border border-neutral-200 p-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+              <div className="text-sm text-neutral-500">Rule Type</div>
+              <div className="text-neutral-900 font-medium">{ruleTypeLabel(rule.rule_type)}</div>
+            </div>
+            <div>
+              <div className="text-sm text-neutral-500">Min Orders</div>
+              <div className="text-neutral-900 font-medium">{rule.min_orders || '-'}</div>
+            </div>
+            <div>
+              <div className="text-sm text-neutral-500">Max Orders</div>
+              <div className="text-neutral-900 font-medium">{rule.max_orders || '-'}</div>
+            </div>
+            <div>
+              <div className="text-sm text-neutral-500">Ordinal</div>
+              <div className="text-neutral-900 font-medium">{rule.ordinal || '-'}</div>
+            </div>
+          </div>
+        </div>
+      )}
 
       {showModal && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
@@ -151,13 +167,15 @@ const AudienceRuleTab = () => {
       {showConfirm && (
         <ConfirmationModal
           isOpen={showConfirm}
-          title="Create Audience Rule"
-          message="Are you sure you want to create this audience rule?"
-          isCommentRequired={false}
-          confirmText="Create"
-          cancelText="Cancel"
-          onConfirm={() => { setShowConfirm(false); handleSave(); }}
-          onCancel={() => setShowConfirm(false)}
+          title={rule ? 'Update Audience Rule' : 'Create Audience Rule'}
+          message={rule ? 'Are you sure you want to update this audience rule?' : 'Are you sure you want to create this audience rule?'}
+          comment={confirmComment}
+          onCommentChange={setConfirmComment}
+          onConfirm={() => { setShowConfirm(false); handleSave(); setConfirmComment(''); }}
+          onCancel={() => { setShowConfirm(false); setConfirmComment(''); }}
+          confirmButtonText={rule ? 'Update' : 'Create'}
+          confirmButtonColor="primary"
+          isCommentRequired={true}
         />
       )}
     </div>

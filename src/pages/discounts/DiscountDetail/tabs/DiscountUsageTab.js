@@ -1,4 +1,5 @@
 import React, { useMemo, useState } from 'react';
+import { PencilIcon } from '@heroicons/react/24/outline';
 import ConfirmationModal from '../../../../components/ConfirmationModal';
 
 const emptyForm = {
@@ -11,8 +12,9 @@ const emptyForm = {
 export default function DiscountUsageTab() {
   const [showModal, setShowModal] = useState(false);
   const [form, setForm] = useState(emptyForm);
-  const [usages, setUsages] = useState([]);
+  const [usage, setUsage] = useState(null);
   const [showConfirm, setShowConfirm] = useState(false);
+  const [confirmComment, setConfirmComment] = useState('');
 
   const canSave = useMemo(() => {
     // All fields optional except at least one should be provided
@@ -36,9 +38,8 @@ export default function DiscountUsageTab() {
       usageLimitTotal: form.usageLimitTotal === '' ? null : Number(form.usageLimitTotal),
       dailyLimitUser: form.dailyLimitUser === '' ? null : Number(form.dailyLimitUser),
       maxOrderFlashSale: form.maxOrderFlashSale === '' ? null : Number(form.maxOrderFlashSale),
-      createdAt: new Date().toISOString(),
     };
-    setUsages((prev) => [payload, ...prev]);
+    setUsage(payload);
     reset();
     setShowModal(false);
   };
@@ -48,53 +49,71 @@ export default function DiscountUsageTab() {
     setShowModal(false);
   };
 
-  const removeUsage = (id) => setUsages((prev) => prev.filter((u) => u.id !== id));
+  const openAdd = () => {
+    reset();
+    setShowModal(true);
+  };
+
+  const openEdit = () => {
+    if (!usage) return;
+    setForm({
+      usagePerLimit: usage.usagePerLimit ?? '',
+      usageLimitTotal: usage.usageLimitTotal ?? '',
+      dailyLimitUser: usage.dailyLimitUser ?? '',
+      maxOrderFlashSale: usage.maxOrderFlashSale ?? '',
+    });
+    setShowModal(true);
+  };
 
   return (
     <div>
       <div className="flex items-center justify-between mb-4">
         <h3 className="text-lg font-medium text-neutral-900">Discount Usage</h3>
-        <button
-          onClick={() => setShowModal(true)}
-          className="px-4 py-2 bg-primary-600 text-white rounded-full hover:bg-primary-700 text-sm font-medium"
-        >
-          Add Discount Usage
-        </button>
+        {!usage ? (
+          <button
+            onClick={openAdd}
+            className="px-4 py-2 bg-primary-600 text-white rounded-full hover:bg-primary-700 text-sm font-medium"
+          >
+            Add Discount Usage
+          </button>
+        ) : (
+          <button
+            onClick={openEdit}
+            className="p-2 border border-neutral-300 rounded-full text-neutral-700 hover:bg-neutral-50"
+            title="Edit"
+            aria-label="Edit usage"
+          >
+            <PencilIcon className="h-4 w-4" />
+          </button>
+        )}
       </div>
 
-      <div className="bg-white rounded-lg border border-neutral-200 overflow-hidden">
-        <div className="overflow-x-auto">
-          <table className="min-w-full divide-y divide-neutral-200">
-            <thead className="bg-neutral-50">
-              <tr>
-                <th className="px-6 py-3 text-left text-xs font-medium text-neutral-500 uppercase tracking-wider">Usage Per Limit</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-neutral-500 uppercase tracking-wider">Usage Limit Total</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-neutral-500 uppercase tracking-wider">Daily Limit User</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-neutral-500 uppercase tracking-wider">Max Order Flash Sale</th>
-                <th className="px-6 py-3 text-right text-xs font-medium text-neutral-500 uppercase tracking-wider">Actions</th>
-              </tr>
-            </thead>
-            <tbody className="bg-white divide-y divide-neutral-200">
-              {usages.length === 0 && (
-                <tr>
-                  <td colSpan={5} className="px-6 py-6 text-sm text-neutral-500 text-center">No usage rules added yet.</td>
-                </tr>
-              )}
-              {usages.map((u) => (
-                <tr key={u.id}>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-neutral-900">{u.usagePerLimit ?? '-'}</td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-neutral-900">{u.usageLimitTotal ?? '-'}</td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-neutral-900">{u.dailyLimitUser ?? '-'}</td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-neutral-900">{u.maxOrderFlashSale ?? '-'}</td>
-                  <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                    <button onClick={() => removeUsage(u.id)} className="text-red-600 hover:text-red-700">Remove</button>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+      {!usage && (
+        <div className="bg-white rounded-lg border border-neutral-200 p-6 text-sm text-neutral-500 text-center">No usage rule added yet.</div>
+      )}
+
+      {usage && (
+        <div className="bg-white rounded-lg border border-neutral-200 p-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+              <div className="text-sm text-neutral-500">Usage Per Limit</div>
+              <div className="text-neutral-900 font-medium">{usage.usagePerLimit ?? '-'}</div>
+            </div>
+            <div>
+              <div className="text-sm text-neutral-500">Usage Limit Total</div>
+              <div className="text-neutral-900 font-medium">{usage.usageLimitTotal ?? '-'}</div>
+            </div>
+            <div>
+              <div className="text-sm text-neutral-500">Daily Limit User</div>
+              <div className="text-neutral-900 font-medium">{usage.dailyLimitUser ?? '-'}</div>
+            </div>
+            <div>
+              <div className="text-sm text-neutral-500">Max Order Flash Sale</div>
+              <div className="text-neutral-900 font-medium">{usage.maxOrderFlashSale ?? '-'}</div>
+            </div>
+          </div>
         </div>
-      </div>
+      )}
 
       {showModal && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
@@ -162,13 +181,15 @@ export default function DiscountUsageTab() {
       {showConfirm && (
         <ConfirmationModal
           isOpen={showConfirm}
-          title="Create Discount Usage"
-          message="Are you sure you want to create these usage limits?"
-          confirmText="Create"
-          cancelText="Cancel"
-          onConfirm={() => { setShowConfirm(false); handleSave(); }}
-          onCancel={() => setShowConfirm(false)}
-          variant="primary"
+          title={usage ? 'Update Discount Usage' : 'Create Discount Usage'}
+          message={usage ? 'Are you sure you want to update these usage limits?' : 'Are you sure you want to create these usage limits?'}
+          comment={confirmComment}
+          onCommentChange={setConfirmComment}
+          onConfirm={() => { setShowConfirm(false); handleSave(); setConfirmComment(''); }}
+          onCancel={() => { setShowConfirm(false); setConfirmComment(''); }}
+          confirmButtonText={usage ? 'Update' : 'Create'}
+          confirmButtonColor="primary"
+          isCommentRequired={true}
         />
       )}
     </div>

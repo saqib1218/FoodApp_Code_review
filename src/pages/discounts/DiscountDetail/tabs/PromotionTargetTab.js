@@ -1,4 +1,5 @@
 import React, { useMemo, useState } from 'react';
+import ConfirmationModal from '../../../../components/ConfirmationModal';
 
 // Mock kitchens and dishes
 const KITCHENS = [
@@ -22,7 +23,7 @@ const PromotionTargetTab = () => {
   const [applyAllKitchens, setApplyAllKitchens] = useState(true);
   const [selectedKitchenIds, setSelectedKitchenIds] = useState([]);
   const [kitchenSelect, setKitchenSelect] = useState('');
-  const [targets, setTargets] = useState([]); // [{id, kitchenId, kitchenName, dishes: [dishIds]}] or special entry for all
+  const [targets, setTargets] = useState([]); // [{id, kitchenId, kitchenName, dishes: [dishIds], status}]
 
   // Assign dishes modal
   const [assignForKitchen, setAssignForKitchen] = useState(null); // { kitchenId, kitchenName }
@@ -44,11 +45,11 @@ const PromotionTargetTab = () => {
     if (!canSave) return;
     if (applyAllKitchens) {
       // Represent as a single special row
-      setTargets([{ id: 'all', all: true, applyAllDishes: true, dishes: [], active: true }]);
+      setTargets([{ id: 'all', all: true, applyAllDishes: true, dishes: [], status: 'Draft' }]);
     } else {
       const rows = selectedKitchenIds.map((kid) => {
         const k = KITCHENS.find((x) => x.id === Number(kid));
-        return { id: `${kid}-${Date.now()}`, kitchenId: Number(kid), kitchenName: k?.name || `Kitchen ${kid}`, dishes: [], applyAllDishes: true, active: true };
+        return { id: `${kid}-${Date.now()}`, kitchenId: Number(kid), kitchenName: k?.name || `Kitchen ${kid}`, dishes: [], applyAllDishes: true, status: 'Draft' };
       });
       setTargets(rows);
     }
@@ -124,6 +125,30 @@ const PromotionTargetTab = () => {
 
   const removeTarget = (predicate) => setTargets((prev) => prev.filter((t) => !predicate(t)));
 
+  // Change Status flow
+  const [showStatusModal, setShowStatusModal] = useState(false);
+  const [statusFor, setStatusFor] = useState(null); // target object
+  const [statusValue, setStatusValue] = useState('Draft');
+  const [showStatusConfirm, setShowStatusConfirm] = useState(false);
+  const [statusComment, setStatusComment] = useState('');
+
+  const openChangeStatus = (target) => {
+    setStatusFor(target);
+    setStatusValue(target.status || 'Draft');
+    setShowStatusModal(true);
+  };
+
+  const submitTarget = (id) => {
+    // For now, set status to Submitted directly; can be adjusted to API later
+    setTargets(prev => prev.map(t => t.id === id ? { ...t, status: 'Submitted' } : t));
+  };
+
+  const applyStatusChange = () => {
+    setTargets(prev => prev.map(t => (statusFor && t.id === statusFor.id ? { ...t, status: statusValue } : t)));
+    setShowStatusModal(false);
+    setStatusFor(null);
+  };
+
   return (
     <div>
       <div className="flex items-center justify-between mb-4">
@@ -150,7 +175,7 @@ const PromotionTargetTab = () => {
             <tbody className="bg-white divide-y divide-neutral-200">
               {targets.length === 0 && (
                 <tr>
-                  <td colSpan={3} className="px-6 py-6 text-sm text-neutral-500 text-center">No targets added yet.</td>
+                  <td colSpan={4} className="px-6 py-6 text-sm text-neutral-500 text-center">No targets added yet.</td>
                 </tr>
               )}
 
@@ -172,28 +197,31 @@ const PromotionTargetTab = () => {
                       </ul>
                     )}
                   </td>
-                  <td className="px-6 py-4 text-sm text-neutral-900">
-                    <label className="inline-flex items-center cursor-pointer">
-                      <input
-                        type="checkbox"
-                        className="sr-only"
-                        checked={!!targets[0].active}
-                        onChange={(e) => {
-                          const val = e.target.checked;
-                          setTargets(prev => prev.map(t => t.all ? { ...t, active: val } : t));
-                        }}
-                      />
-                      <span className={`w-10 h-6 flex items-center rounded-full p-1 transition-colors ${targets[0].active ? 'bg-primary-600' : 'bg-neutral-300'}`}>
-                        <span className={`bg-white w-4 h-4 rounded-full transform transition-transform ${targets[0].active ? 'translate-x-4' : ''}`}></span>
-                      </span>
-                    </label>
-                  </td>
+                  <td className="px-6 py-4 text-sm text-neutral-900">{targets[0].status || 'Draft'}</td>
                   <td className="px-6 py-4 text-right text-sm font-medium space-x-3">
                     <button
                       onClick={() => openAssignDishes({ all: true, kitchenName: 'All Kitchens' })}
                       className="text-primary-600 hover:text-primary-800"
                     >
                       Add Dish
+                    </button>
+                    <button
+                      onClick={() => submitTarget(targets[0].id)}
+                      className="text-primary-600 hover:text-primary-800"
+                    >
+                      Submit
+                    </button>
+                    <button
+                      onClick={() => openChangeStatus(targets[0])}
+                      className="text-primary-600 hover:text-primary-800"
+                    >
+                      Change Status
+                    </button>
+                    <button
+                      onClick={() => setTargets([])}
+                      className="text-primary-600 hover:text-primary-800"
+                    >
+                      Remove
                     </button>
                   </td>
                 </tr>
@@ -217,28 +245,31 @@ const PromotionTargetTab = () => {
                       </ul>
                     )}
                   </td>
-                  <td className="px-6 py-4 text-sm text-neutral-900">
-                    <label className="inline-flex items-center cursor-pointer">
-                      <input
-                        type="checkbox"
-                        className="sr-only"
-                        checked={!!t.active}
-                        onChange={(e) => {
-                          const val = e.target.checked;
-                          setTargets(prev => prev.map(x => x.id === t.id ? { ...x, active: val } : x));
-                        }}
-                      />
-                      <span className={`w-10 h-6 flex items-center rounded-full p-1 transition-colors ${t.active ? 'bg-primary-600' : 'bg-neutral-300'}`}>
-                        <span className={`bg-white w-4 h-4 rounded-full transform transition-transform ${t.active ? 'translate-x-4' : ''}`}></span>
-                      </span>
-                    </label>
-                  </td>
+                  <td className="px-6 py-4 text-sm text-neutral-900">{t.status || 'Draft'}</td>
                   <td className="px-6 py-4 text-right text-sm font-medium space-x-3">
                     <button
                       onClick={() => openAssignDishes({ kitchenId: t.kitchenId, kitchenName: t.kitchenName })}
                       className="text-primary-600 hover:text-primary-800"
                     >
                       Add Dish
+                    </button>
+                    <button
+                      onClick={() => submitTarget(t.id)}
+                      className="text-primary-600 hover:text-primary-800"
+                    >
+                      Submit
+                    </button>
+                    <button
+                      onClick={() => openChangeStatus(t)}
+                      className="text-primary-600 hover:text-primary-800"
+                    >
+                      Change Status
+                    </button>
+                    <button
+                      onClick={() => removeTarget(x => x.id === t.id)}
+                      className="text-primary-600 hover:text-primary-800"
+                    >
+                      Remove
                     </button>
                   </td>
                 </tr>
@@ -328,6 +359,54 @@ const PromotionTargetTab = () => {
             </div>
           </div>
         </div>
+      )}
+
+      {/* Change Status Modal */}
+      {showStatusModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-xl shadow-lg max-w-md w-full p-6 max-h-[90vh] overflow-y-auto">
+            <div className="flex justify-between items-center mb-6">
+              <h3 className="text-lg font-medium text-neutral-900">Change Status</h3>
+              <button onClick={() => setShowStatusModal(false)} className="text-neutral-400 hover:text-neutral-600">✕</button>
+            </div>
+            <div className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-neutral-700 mb-1">Status</label>
+                <select
+                  value={statusValue}
+                  onChange={(e) => setStatusValue(e.target.value)}
+                  className="w-full p-2 border border-neutral-300 rounded-lg"
+                >
+                  <option value="Draft">Draft</option>
+                  <option value="Active">Active</option>
+                  <option value="Paused">Paused</option>
+                  <option value="Disabled">Disabled</option>
+                  <option value="Submitted">Submitted</option>
+                </select>
+              </div>
+            </div>
+            <div className="flex justify-end gap-3 mt-6">
+              <button onClick={() => setShowStatusModal(false)} className="px-4 py-2 bg-white border border-neutral-300 text-neutral-700 rounded-full hover:bg-neutral-50 text-sm font-medium">Cancel</button>
+              <button onClick={() => { setShowStatusModal(false); setShowStatusConfirm(true); }} className="px-4 py-2 bg-primary-600 text-white rounded-full hover:bg-primary-700 text-sm font-medium">Save</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Change Status Confirmation */}
+      {showStatusConfirm && (
+        <ConfirmationModal
+          isOpen={showStatusConfirm}
+          title="Confirm Status Change"
+          message={`Are you sure you want to change status to "${statusValue}"?`}
+          comment={statusComment}
+          onCommentChange={setStatusComment}
+          onConfirm={() => { setShowStatusConfirm(false); applyStatusChange(); setStatusComment(''); }}
+          onCancel={() => { setShowStatusConfirm(false); setStatusComment(''); }}
+          confirmButtonText="Apply"
+          confirmButtonColor="primary"
+          isCommentRequired={true}
+        />
       )}
 
       {/* Assign Dishes Modal (dual list) */}

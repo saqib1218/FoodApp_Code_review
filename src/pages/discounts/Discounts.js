@@ -52,6 +52,7 @@ const Discounts = () => {
     nameDisplay: '',
     nameInternal: '',
     campaignLabel: '',
+    descriptionInternal: '',
     promotionType: 'standard',
   });
   const [editingId, setEditingId] = useState(null);
@@ -61,6 +62,7 @@ const Discounts = () => {
   const [pendingAction, setPendingAction] = useState(null);
   const [confirmationComment, setConfirmationComment] = useState('');
   const [showCreateConfirm, setShowCreateConfirm] = useState(false);
+  const [createConfirmComment, setCreateConfirmComment] = useState('');
 
   // Search and Filters
   const [searchText, setSearchText] = useState('');
@@ -90,7 +92,7 @@ const Discounts = () => {
 
   const handleCreatePromotion = () => {
     setEditingId(null);
-    setCreateForm({ nameDisplay: '', nameInternal: '', campaignLabel: '', promotionType: 'standard' });
+    setCreateForm({ nameDisplay: '', nameInternal: '', campaignLabel: '', descriptionInternal: '', promotionType: 'standard' });
     setShowCreateModal(true);
   };
 
@@ -149,6 +151,7 @@ const Discounts = () => {
         name: createForm.nameDisplay,
         internalName: createForm.nameInternal,
         campaignLabel: createForm.campaignLabel,
+        internalDescription: createForm.descriptionInternal,
         type: createForm.promotionType,
         status: 'draft',
         startDate: new Date().toISOString(),
@@ -157,7 +160,7 @@ const Discounts = () => {
       };
       setDiscounts(prev => [newPromotion, ...prev]);
     }
-    setCreateForm({ nameDisplay: '', nameInternal: '', campaignLabel: '', promotionType: 'standard' });
+    setCreateForm({ nameDisplay: '', nameInternal: '', campaignLabel: '', descriptionInternal: '', promotionType: 'standard' });
     setEditingId(null);
     setShowCreateModal(false);
   };
@@ -421,7 +424,7 @@ const Discounts = () => {
       {/* Create Promotion Modal - Simplified */}
       {showCreateModal && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-xl shadow-lg max-w-md w-full p-6">
+          <div className="bg-white rounded-xl shadow-lg max-w-md w-full p-6 max-h-[90vh] overflow-y-auto">
             <div className="flex justify-between items-center mb-6">
               <h3 className="text-lg font-medium text-neutral-900">{editingId ? 'Edit Promotion' : 'Create Promotion'}</h3>
               <button onClick={handleCancelPromotion} className="text-gray-400 hover:text-gray-600">
@@ -447,6 +450,17 @@ const Discounts = () => {
                   onChange={(e) => setCreateForm({ ...createForm, nameInternal: e.target.value })}
                   className="w-full p-2 border border-neutral-300 rounded-lg"
                   placeholder="Internal reference name"
+                />
+              </div>
+              
+              <div>
+                <label className="block text-sm font-medium text-neutral-700 mb-1">Description Internal</label>
+                <textarea
+                  rows={3}
+                  value={createForm.descriptionInternal}
+                  onChange={(e) => setCreateForm({ ...createForm, descriptionInternal: e.target.value })}
+                  className="w-full p-2 border border-neutral-300 rounded-lg"
+                  placeholder="Internal description (not shown to customers)"
                 />
               </div>
               <div>
@@ -503,11 +517,13 @@ const Discounts = () => {
           isOpen={showCreateConfirm}
           title={editingId ? 'Update Promotion' : 'Create Promotion'}
           message={editingId ? 'Are you sure you want to update this promotion?' : 'Are you sure you want to create this promotion?'}
-          onConfirm={() => { setShowCreateConfirm(false); handleSavePromotion(); }}
-          onCancel={() => setShowCreateConfirm(false)}
+          comment={createConfirmComment}
+          onCommentChange={setCreateConfirmComment}
+          onConfirm={() => { setShowCreateConfirm(false); handleSavePromotion(); setCreateConfirmComment(''); }}
+          onCancel={() => { setShowCreateConfirm(false); setCreateConfirmComment(''); }}
           confirmButtonText={editingId ? 'Update' : 'Create'}
           confirmButtonColor="primary"
-          isCommentRequired={false}
+          isCommentRequired={true}
         />
       )}
     </div>

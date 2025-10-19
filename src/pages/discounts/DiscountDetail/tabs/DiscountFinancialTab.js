@@ -1,37 +1,18 @@
 import React, { useMemo, useState } from 'react';
-import { PlusIcon, XMarkIcon } from '@heroicons/react/24/outline';
+import { PlusIcon, XMarkIcon, PencilIcon } from '@heroicons/react/24/outline';
 import ConfirmationModal from '../../../../components/ConfirmationModal';
 
-const initialFinancials = [
-  // Mock seed data
-  {
-    id: 1,
-    idea: 'percentage',
-    ownedBy: 'kitchen',
-    stackable: true,
-    percentValue: 20,
-    maxDiscountPercent: 50,
-    createdAt: new Date().toISOString(),
-  },
-  {
-    id: 2,
-    idea: 'price',
-    ownedBy: 'platform',
-    stackable: false,
-    amountMinor: 5000, // Rs. 50.00
-    currency: 'PKR',
-    maxDiscountMinor: 15000, // Rs. 150.00
-    createdAt: new Date().toISOString(),
-  },
-];
+const initialFinancials = [];
 
 const currencyLabel = (code) => code || 'PKR';
 const formatMinorToDisplay = (minor) => `Rs. ${(minor || 0) / 100}`;
 
 export default function DiscountFinancialTab() {
-  const [financials, setFinancials] = useState(initialFinancials);
+  // Single rule mode
+  const [financial, setFinancial] = useState(null);
   const [showModal, setShowModal] = useState(false);
   const [showConfirm, setShowConfirm] = useState(false);
+  const [confirmComment, setConfirmComment] = useState('');
 
   const [form, setForm] = useState({
     idea: 'percentage',
@@ -53,26 +34,38 @@ export default function DiscountFinancialTab() {
     quantity: '',
   });
 
-  const openModal = () => {
+  const canSave = useMemo(() => {
+    if (form.idea === 'percentage') {
+      return form.percentValue !== '' && form.maxDiscountPercent !== '';
+    }
+    if (form.idea === 'price') {
+      return form.amountMinor !== '' && form.maxDiscountMinor !== '';
+    }
+    if (form.idea === 'quantity') {
+      return form.buyQty !== '' && form.getQty !== '';
+    }
+    return true;
+  }, [form]);
+
+  const openModal = () => setShowModal(true);
+
+  const openEdit = () => {
+    if (!financial) return;
     setForm({
-      idea: 'percentage',
-      ownedBy: 'kitchen',
-      stackable: false,
-      percentValue: '',
-      maxDiscountPercent: '',
-      amountMinor: '',
-      currency: 'PKR',
-      maxDiscountMinor: '',
-      buyQty: '',
-      getQty: '',
-      freeLowestItem: false,
-      price: '',
-      quantity: '',
+      idea: financial.idea,
+      percentValue: financial.percentValue ?? '',
+      maxDiscountPercent: financial.maxDiscountPercent ?? '',
+      amountMinor: financial.amountMinor ?? '',
+      currency: financial.currency ?? 'PKR',
+      maxDiscountMinor: financial.maxDiscountMinor ?? '',
+      buyQty: financial.buyQty ?? '',
+      getQty: financial.getQty ?? '',
+      freeLowestItem: !!financial.freeLowestItem,
+      ownedBy: financial.ownedBy ?? 'kitchen',
+      stackable: !!financial.stackable,
     });
     setShowModal(true);
   };
-
-  const closeModal = () => setShowModal(false);
 
   const handleSave = () => {
     // Basic validation by type
@@ -84,7 +77,7 @@ export default function DiscountFinancialTab() {
       if (form.buyQty === '' || form.getQty === '') return;
     }
 
-    const payload = { id: Date.now(), createdAt: new Date().toISOString(), ...form };
+    const payload = { id: Date.now(), ...form };
     // Normalize numbers
     if (payload.percentValue !== undefined) payload.percentValue = Number(payload.percentValue);
     if (payload.maxDiscountPercent !== undefined && payload.maxDiscountPercent !== '') payload.maxDiscountPercent = Number(payload.maxDiscountPercent);
@@ -93,9 +86,24 @@ export default function DiscountFinancialTab() {
     if (payload.buyQty !== undefined && payload.buyQty !== '') payload.buyQty = Number(payload.buyQty);
     if (payload.getQty !== undefined && payload.getQty !== '') payload.getQty = Number(payload.getQty);
 
-    setFinancials((prev) => [payload, ...prev]);
+    setFinancial(payload);
     setShowModal(false);
+    setForm({
+      idea: 'percentage',
+      percentValue: '',
+      maxDiscountPercent: '',
+      amountMinor: '',
+      currency: 'PKR',
+      maxDiscountMinor: '',
+      buyQty: '',
+      getQty: '',
+      freeLowestItem: false,
+      ownedBy: 'kitchen',
+      stackable: false,
+    });
   };
+
+  const closeModal = () => setShowModal(false);
 
   const columns = useMemo(() => ([
     { key: 'idea', label: 'Discount Idea' },
@@ -138,42 +146,93 @@ export default function DiscountFinancialTab() {
     <div className="space-y-4">
       <div className="flex items-center justify-between mb-2">
         <h3 className="text-lg font-medium text-neutral-900">Discount Financial</h3>
-        <button
-          onClick={openModal}
-          className="px-4 py-2 bg-primary-600 text-white rounded-full hover:bg-primary-700 text-sm font-medium"
-        >
-          Add Discount Financial
-        </button>
+        {!financial ? (
+          <button
+            onClick={openModal}
+            className="px-4 py-2 bg-primary-600 text-white rounded-full hover:bg-primary-700 text-sm font-medium"
+          >
+            Add Discount Financial
+          </button>
+        ) : (
+          <button
+            onClick={openEdit}
+            className="p-2 border border-neutral-300 rounded-full text-neutral-700 hover:bg-neutral-50"
+            title="Edit"
+            aria-label="Edit financial"
+          >
+            <PencilIcon className="h-4 w-4" />
+          </button>
+        )}
       </div>
 
-      <div className="bg-white border border-neutral-200 rounded-lg overflow-hidden">
-        <div className="overflow-x-auto">
-          <table className="min-w-full divide-y divide-neutral-200">
-            <thead className="bg-neutral-50">
-              <tr>
-                {columns.map((c) => (
-                  <th key={c.key} className="px-6 py-3 text-left text-xs font-medium text-neutral-600 uppercase tracking-wider">{c.label}</th>
-                ))}
-              </tr>
-            </thead>
-            <tbody className="bg-white divide-y divide-neutral-100">
-              {financials.length === 0 ? (
-                <tr>
-                  <td colSpan={columns.length} className="px-6 py-6 text-center text-neutral-500">No financial rules added yet.</td>
-                </tr>
-              ) : financials.map((row) => (
-                <tr key={row.id} className="hover:bg-neutral-50">
-                  <td className="px-6 py-3 text-sm text-neutral-900 capitalize">{row.idea}</td>
-                  <td className="px-6 py-3 text-sm text-neutral-900 capitalize">{row.ownedBy}</td>
-                  <td className="px-6 py-3 text-sm text-neutral-900">{row.stackable ? 'Yes' : 'No'}</td>
-                  <td className="px-6 py-3">{renderDetails(row)}</td>
-                  <td className="px-6 py-3 text-sm text-neutral-700">{new Date(row.createdAt).toLocaleDateString()}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+      {!financial && (
+        <div className="bg-white rounded-lg border border-neutral-200 p-6 text-sm text-neutral-500 text-center">
+          No discount financial rule added yet.
         </div>
-      </div>
+      )}
+
+      {financial && (
+        <div className="bg-white rounded-lg border border-neutral-200 p-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+              <div className="text-sm text-neutral-500">Type</div>
+              <div className="text-neutral-900 font-medium capitalize">{financial.idea}</div>
+            </div>
+            {financial.idea === 'percentage' && (
+              <>
+                <div>
+                  <div className="text-sm text-neutral-500">Percentage Value</div>
+                  <div className="text-neutral-900 font-medium">{financial.percentValue || '-'}</div>
+                </div>
+                <div>
+                  <div className="text-sm text-neutral-500">Max Discount %</div>
+                  <div className="text-neutral-900 font-medium">{financial.maxDiscountPercent || '-'}</div>
+                </div>
+              </>
+            )}
+            {financial.idea === 'price' && (
+              <>
+                <div>
+                  <div className="text-sm text-neutral-500">Amount Minor</div>
+                  <div className="text-neutral-900 font-medium">{financial.amountMinor || '-'}</div>
+                </div>
+                <div>
+                  <div className="text-sm text-neutral-500">Currency</div>
+                  <div className="text-neutral-900 font-medium">{financial.currency || 'PKR'}</div>
+                </div>
+                <div>
+                  <div className="text-sm text-neutral-500">Max Discount Minor</div>
+                  <div className="text-neutral-900 font-medium">{financial.maxDiscountMinor || '-'}</div>
+                </div>
+              </>
+            )}
+            {financial.idea === 'quantity' && (
+              <>
+                <div>
+                  <div className="text-sm text-neutral-500">Buy QTY</div>
+                  <div className="text-neutral-900 font-medium">{financial.buyQty || '-'}</div>
+                </div>
+                <div>
+                  <div className="text-sm text-neutral-500">Get QTY</div>
+                  <div className="text-neutral-900 font-medium">{financial.getQty || '-'}</div>
+                </div>
+                <div>
+                  <div className="text-sm text-neutral-500">Free Lowest Item</div>
+                  <div className="text-neutral-900 font-medium">{financial.freeLowestItem ? 'Yes' : 'No'}</div>
+                </div>
+              </>
+            )}
+            <div>
+              <div className="text-sm text-neutral-500">Owned By</div>
+              <div className="text-neutral-900 font-medium capitalize">{financial.ownedBy}</div>
+            </div>
+            <div>
+              <div className="text-sm text-neutral-500">Stackable</div>
+              <div className="text-neutral-900 font-medium">{financial.stackable ? 'Yes' : 'No'}</div>
+            </div>
+          </div>
+        </div>
+      )}
 
       {showModal && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
@@ -324,7 +383,7 @@ export default function DiscountFinancialTab() {
 
             <div className="flex justify-end gap-3 mt-6">
               <button onClick={closeModal} className="px-4 py-2 bg-white border border-neutral-300 text-neutral-700 rounded-full hover:bg-neutral-50 text-sm font-medium">Cancel</button>
-              <button onClick={() => setShowConfirm(true)} className="px-4 py-2 bg-primary-600 text-white rounded-full hover:bg-primary-700 text-sm font-medium">Save</button>
+              <button disabled={!canSave} onClick={() => canSave && setShowConfirm(true)} className={`px-4 py-2 rounded-full text-sm font-medium ${canSave ? 'bg-primary-600 text-white hover:bg-primary-700' : 'bg-neutral-300 text-neutral-600 cursor-not-allowed'}`}>Save</button>
             </div>
           </div>
         </div>
@@ -333,13 +392,15 @@ export default function DiscountFinancialTab() {
       {showConfirm && (
         <ConfirmationModal
           isOpen={showConfirm}
-          title="Create Discount Financial"
-          message="Are you sure you want to add this discount financial rule?"
-          isCommentRequired={false}
-          confirmText="Create"
-          cancelText="Cancel"
-          onConfirm={() => { setShowConfirm(false); handleSave(); }}
-          onCancel={() => setShowConfirm(false)}
+          title={financial ? 'Update Discount Financial' : 'Create Discount Financial'}
+          message={financial ? 'Are you sure you want to update this discount financial rule?' : 'Are you sure you want to add this discount financial rule?'}
+          comment={confirmComment}
+          onCommentChange={setConfirmComment}
+          onConfirm={() => { setShowConfirm(false); handleSave(); setConfirmComment(''); }}
+          onCancel={() => { setShowConfirm(false); setConfirmComment(''); }}
+          confirmButtonText={financial ? 'Update' : 'Create'}
+          confirmButtonColor="primary"
+          isCommentRequired={true}
         />
       )}
     </div>
