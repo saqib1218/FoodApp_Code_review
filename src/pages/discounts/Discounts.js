@@ -2,52 +2,26 @@ import React, { useState, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { PlusIcon, EyeIcon, XMarkIcon, MagnifyingGlassIcon, FunnelIcon } from '@heroicons/react/24/outline';
 import ConfirmationModal from '../../components/ConfirmationModal';
+import DialogueBox from '../../components/DialogueBox';
+import { useGetPromotionsQuery, useCreatePromotionMutation, useLazyGetPromotionByIdQuery } from '../../store/api/modules/discounts/discountsApi';
 
 const Discounts = () => {
   const navigate = useNavigate();
 
   const [isLoading] = useState(false);
-  const [discounts, setDiscounts] = useState([
-    {
-      id: 1,
-      name: 'Weekend Special',
-      type: 'percentage',
-      value: 20,
-      status: 'active',
-      startDate: '2024-01-15',
-      endDate: '2024-02-15',
-      promoCode: 'WEEKEND20',
-      minOrderAmount: 500,
-      description: '20% off on weekend orders'
-    },
-    {
-      id: 2,
-      name: 'Buy 1 Get 1 Pizza',
-      type: 'bogo',
-      value: 1,
-      status: 'active',
-      startDate: '2024-01-10',
-      endDate: '2024-01-31',
-      promoCode: 'BOGO1',
-      minOrderAmount: 0,
-      description: 'Buy 1 pizza get 1 free'
-    },
-    {
-      id: 3,
-      name: 'New Year Offer',
-      type: 'amount',
-      value: 100,
-      status: 'inactive',
-      startDate: '2024-01-01',
-      endDate: '2024-01-07',
-      promoCode: 'NEWYEAR100',
-      minOrderAmount: 1000,
-      description: 'Rs. 100 off on orders above Rs. 1000'
-    }
-  ]);
+  // API: Promotions list
+  const { data: promotionsResp, isLoading: promotionsLoading, isError: promotionsError, refetch: refetchPromotions } = useGetPromotionsQuery({ page: 1, limit: 20 });
+  const promotions = promotionsResp?.data?.items || [];
+
+  const [createPromotion, { isLoading: creatingPromotion }] = useCreatePromotionMutation();
+  const [triggerGetPromotionById] = useLazyGetPromotionByIdQuery();
 
   // Simplified create promotion modal state
   const [showCreateModal, setShowCreateModal] = useState(false);
+  // Dialogue box state for feedback
+  const [dialogueBox, setDialogueBox] = useState({ isOpen: false, type: 'success', title: '', message: '' });
+  const showDialogue = (type, title, message) => setDialogueBox({ isOpen: true, type, title, message });
+  const closeDialogue = () => setDialogueBox({ isOpen: false, type: 'success', title: '', message: '' });
   const [createForm, setCreateForm] = useState({
     nameDisplay: '',
     nameInternal: '',
@@ -97,9 +71,9 @@ const Discounts = () => {
   };
 
   // Derived: filtered list
-  const baseFiltered = discounts.filter((d) => {
+  const baseFiltered = promotions.filter((d) => {
     // Search by Discount Name
-    const matchesSearch = !searchText || (d.name || '').toLowerCase().includes(searchText.toLowerCase());
+    const matchesSearch = !searchText || (d.nameDisplay || '').toLowerCase().includes(searchText.toLowerCase());
     // Filter by Kitchen Name (if present on object)
     const matchesKitchen = !filters.kitchenName || (d.kitchenName || '').toLowerCase().includes(filters.kitchenName.toLowerCase());
     // Filter by Internal Name (map to idea/description as internal name surrogate)
@@ -123,7 +97,7 @@ const Discounts = () => {
     return Number(d.id) || 0;
   };
 
-  const filteredDiscounts = useMemo(() => {
+  const filteredPromotions = useMemo(() => {
     const arr = [...headerStatusFiltered];
     if (sort.key === 'createdAt') {
       arr.sort((a, b) => {
@@ -135,34 +109,25 @@ const Discounts = () => {
     return arr;
   }, [headerStatusFiltered, sort]);
 
-  const handleSavePromotion = () => {
-    if (!createForm.nameDisplay.trim()) return;
-    if (editingId) {
-      setDiscounts(prev => prev.map(d => d.id === editingId ? {
-        ...d,
-        name: createForm.nameDisplay,
-        internalName: createForm.nameInternal,
+  const handleSavePromotion = async () => {
+    try {
+      const payload = {
+        nameDisplay: createForm.nameDisplay,
+        promotionType: createForm.promotionType,
         campaignLabel: createForm.campaignLabel,
-        type: createForm.promotionType,
-      } : d));
-    } else {
-      const newPromotion = {
-        id: Date.now(),
-        name: createForm.nameDisplay,
-        internalName: createForm.nameInternal,
-        campaignLabel: createForm.campaignLabel,
-        internalDescription: createForm.descriptionInternal,
-        type: createForm.promotionType,
-        status: 'draft',
-        startDate: new Date().toISOString(),
-        endDate: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(),
-        description: createForm.campaignLabel,
+        descriptionInternal: createForm.descriptionInternal,
+        nameInternal: createForm.nameInternal,
       };
-      setDiscounts(prev => [newPromotion, ...prev]);
+      const res = await createPromotion(payload).unwrap();
+      showDialogue('success', res?.i18n_key || 'Success', res?.message || 'Promotion created successfully.');
+      setShowCreateModal(false);
+      setCreateForm({ nameDisplay: '', nameInternal: '', campaignLabel: '', descriptionInternal: '', promotionType: 'standard' });
+      setEditingId(null);
+      refetchPromotions();
+    } catch (err) {
+      const msg = err?.data?.message || err?.error || 'Failed to create promotion.';
+      showDialogue('error', 'Error', msg);
     }
-    setCreateForm({ nameDisplay: '', nameInternal: '', campaignLabel: '', descriptionInternal: '', promotionType: 'standard' });
-    setEditingId(null);
-    setShowCreateModal(false);
   };
 
   const handleCancelPromotion = () => {
@@ -171,16 +136,25 @@ const Discounts = () => {
     setEditingId(null);
   };
 
+  // Match DishesList spinner behavior: full-page spinner while loading
+  if (promotionsLoading) {
+    return (
+      <div className="flex items-center justify-center py-12">
+        <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-primary-500"></div>
+      </div>
+    );
+  }
+
   const handleDeleteDiscount = (discountId) => {
-    const target = discounts.find(d => d.id === discountId);
-    setPendingAction({ discountId, discountName: target?.name || '' });
+    const target = promotions.find(d => d.id === discountId);
+    setPendingAction({ discountId, discountName: target?.nameDisplay || '' });
     setShowConfirmationModal(true);
     setConfirmationComment('');
   };
 
   const handleConfirmDelete = () => {
     if (!pendingAction) return;
-    setDiscounts(prev => prev.filter(d => d.id !== pendingAction.discountId));
+    // setDiscounts(prev => prev.filter(d => d.id !== pendingAction.discountId));
     setShowConfirmationModal(false);
     setPendingAction(null);
     setConfirmationComment('');
@@ -328,91 +302,67 @@ const Discounts = () => {
         )}
       </div>
 
-      {/* Discounts Table */}
-      <div className="bg-white shadow overflow-hidden rounded-lg">
+      {/* Promotions Table (from API) */}
+      <div className="bg-white rounded-lg border border-neutral-200 overflow-hidden">
         <div className="overflow-x-auto">
-          <table className="min-w-full divide-y divide-gray-200">
-            <thead className="bg-gray-50">
+          <table className="min-w-full divide-y divide-neutral-200">
+            <thead className="bg-neutral-50">
               <tr>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Name & Type</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Value</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  <button
-                    type="button"
-                    onClick={() => setStatusHeaderToggle(prev => prev === 'active' ? 'inactive' : 'active')}
-                    className="inline-flex items-center gap-2 text-gray-600 hover:text-gray-900"
-                  >
-                    Status
-                    {statusHeaderToggle && (
-                      <span className={`text-xs px-2 py-0.5 rounded-full ${statusHeaderToggle==='active' ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>
-                        {statusHeaderToggle}
-                      </span>
-                    )}
-                  </button>
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  <button
-                    type="button"
-                    onClick={() => setSort(s => ({ key: 'createdAt', direction: s.direction === 'desc' ? 'asc' : 'desc' }))}
-                    className="inline-flex items-center gap-2 text-gray-600 hover:text-gray-900"
-                    title="Sort by Created At"
-                  >
-                    Created At
-                    <span className="text-xs text-gray-400">{sort.direction === 'desc' ? '(Latest)' : '(Oldest)'}</span>
-                  </button>
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Duration</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-neutral-500 uppercase tracking-wider">Name Display</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-neutral-500 uppercase tracking-wider">Promotion Type</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-neutral-500 uppercase tracking-wider">Campaign Label</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-neutral-500 uppercase tracking-wider">Status</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-neutral-500 uppercase tracking-wider">Created At</th>
+                <th className="px-6 py-3 text-right text-xs font-medium text-neutral-500 uppercase tracking-wider">Actions</th>
               </tr>
             </thead>
-            <tbody className="bg-white divide-y divide-gray-200">
-              {filteredDiscounts.length === 0 ? (
+            <tbody className="bg-white divide-y divide-neutral-100">
+              {promotionsLoading ? (
                 <tr>
-                  <td colSpan={5} className="p-6 text-center">
-                    <p className="text-neutral-500">No discounts found matching your criteria.</p>
-                    <button
-                      onClick={resetFilters}
-                      className="mt-2 text-primary-600 hover:text-primary-500"
-                    >
-                      Reset filters
-                    </button>
+                  <td colSpan={6} className="px-6 py-10">
+                    <div className="flex items-center justify-center">
+                      <div className="h-6 w-6 border-2 border-primary-600 border-t-transparent rounded-full animate-spin mr-3"></div>
+                      <span className="text-sm text-neutral-600">Loading promotions...</span>
+                    </div>
                   </td>
                 </tr>
-              ) : filteredDiscounts.map((discount) => (
-                <tr key={discount.id} className="hover:bg-gray-50">
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    <div>
-                      <div className="text-sm font-medium text-gray-900">{discount.name}</div>
-                      <div className="mt-1">{getTypeBadge(discount.type)}</div>
-                      {discount.promoCode && (
-                        <div className="text-xs text-gray-500 mt-1">Code: {discount.promoCode}</div>
-                      )}
-                    </div>
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    <div className="text-sm text-gray-900">{formatDiscountValue(discount)}</div>
-                    {discount.minOrderAmount > 0 && (
-                      <div className="text-xs text-gray-500">Min: Rs. {discount.minOrderAmount}</div>
-                    )}
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap">{getStatusBadge(discount.status)}</td>
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    <div className="text-sm text-gray-900">{new Date(getCreatedAt(discount)).toLocaleDateString()}</div>
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    <div className="text-sm text-gray-900">{new Date(discount.startDate).toLocaleDateString()}</div>
-                    <div className="text-xs text-gray-500">to {new Date(discount.endDate).toLocaleDateString()}</div>
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
-                    <div className="flex items-center space-x-3">
-                      <button
-                        onClick={() => navigate(`/discounts/${discount.id}`)}
-                        className="text-green-600 hover:text-green-900 transition-colors"
-                        title="View discount"
-                      >
-                        <EyeIcon className="h-4 w-4" />
-                      </button>
-                    </div>
+              ) : promotionsError ? (
+                <tr><td colSpan={6} className="px-6 py-6 text-center text-sm text-red-600">Failed to load promotions.</td></tr>
+              ) : promotions.length === 0 ? (
+                <tr>
+                  <td colSpan={6} className="px-6 py-6 text-center text-sm text-neutral-500">No promotions found.</td>
+                </tr>
+              ) : promotions.map((p) => (
+                <tr key={p.id} className="hover:bg-neutral-50">
+                  <td className="px-6 py-3 text-sm text-neutral-900">{p.nameDisplay || '-'}</td>
+                  <td className="px-6 py-3 text-sm text-neutral-900">{p.promotionType || '-'}</td>
+                  <td className="px-6 py-3 text-sm text-neutral-900">{p.campaignLabel || '-'}</td>
+                  <td className="px-6 py-3 text-sm">{p.status || '-'}</td>
+                  <td className="px-6 py-3 text-sm text-neutral-700">{p.createdAt ? new Date(p.createdAt).toLocaleString() : '-'}</td>
+                  <td className="px-6 py-3 text-right">
+                    <button
+                      onClick={async () => {
+                        try {
+                          const res = await triggerGetPromotionById(p.id).unwrap();
+                          const data = res?.data || {};
+                          navigate(`/discounts/${p.id}`, { state: { promotion: {
+                            id: data.id || p.id,
+                            nameInternal: data.nameInternal ?? null,
+                            nameDisplay: data.nameDisplay ?? p.nameDisplay ?? null,
+                            promotionType: data.promotionType ?? p.promotionType ?? null,
+                            campaignLabel: data.campaignLabel ?? p.campaignLabel ?? null,
+                            status: data.status ?? p.status ?? null,
+                            descriptionInternal: data.descriptionInternal ?? null,
+                          } } });
+                        } catch (e) {
+                          showDialogue('error', 'Error', e?.data?.message || 'Failed to fetch promotion details.');
+                        }
+                      }}
+                      className="text-primary-600 hover:text-primary-800"
+                      title="View promotion"
+                    >
+                      <EyeIcon className="h-5 w-5 inline" />
+                    </button>
                   </td>
                 </tr>
               ))}
@@ -526,6 +476,15 @@ const Discounts = () => {
           isCommentRequired={true}
         />
       )}
+
+      {/* DialogueBox for feedback */}
+      <DialogueBox
+        isOpen={dialogueBox.isOpen}
+        onClose={closeDialogue}
+        type={dialogueBox.type}
+        title={dialogueBox.title}
+        message={dialogueBox.message}
+      />
     </div>
   );
 };

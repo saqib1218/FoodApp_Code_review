@@ -1,30 +1,53 @@
 import React, { useMemo, useState } from 'react';
+import { useParams } from 'react-router-dom';
 import { PencilIcon } from '@heroicons/react/24/outline';
 import ConfirmationModal from '../../../../components/ConfirmationModal';
+import DialogueBox from '../../../../components/DialogueBox';
+import { useUpdatePromotionMutation, useGetPromotionByIdQuery } from '../../../../store/api/modules/discounts/discountsApi';
 
 const emptyForm = { startDate: '', endDate: '', timeZone: 'Karachi' };
 
 export default function DiscountScheduleTab() {
+  const { id } = useParams();
   const [showModal, setShowModal] = useState(false);
   const [form, setForm] = useState(emptyForm);
   const [schedule, setSchedule] = useState(null);
   const [showConfirm, setShowConfirm] = useState(false);
   const [confirmComment, setConfirmComment] = useState('');
+  const [dialogueBox, setDialogueBox] = useState({ isOpen: false, type: 'success', title: '', message: '' });
+  const showDialogue = (type, title, message) => setDialogueBox({ isOpen: true, type, title, message });
+  const closeDialogue = () => setDialogueBox({ isOpen: false, type: 'success', title: '', message: '' });
+
+  const [updatePromotion, { isLoading: updating }] = useUpdatePromotionMutation();
+  const { data: detailsResp } = useGetPromotionByIdQuery(id, { skip: !id });
+  const details = detailsResp?.data || {};
+  const hasBackendSchedule = !!(details?.startsAt || details?.endsAt);
+
+  const backendSchedule = hasBackendSchedule ? {
+    startDate: details.startsAt,
+    endDate: details.endsAt,
+    timeZone: details.timezone || 'Karachi',
+  } : null;
 
   const canSave = useMemo(() => !!form.startDate && !!form.endDate, [form.startDate, form.endDate]);
 
   const reset = () => setForm(emptyForm);
 
-  const handleSave = () => {
-    if (!canSave) return;
-    setSchedule({
-      id: Date.now(),
-      startDate: form.startDate,
-      endDate: form.endDate,
-      timeZone: form.timeZone,
-    });
-    reset();
-    setShowModal(false);
+  const handleSave = async () => {
+    if (!canSave || !id) return;
+    // Convert datetime-local to ISO strings
+    const startsAt = form.startDate ? new Date(form.startDate).toISOString() : null;
+    const endsAt = form.endDate ? new Date(form.endDate).toISOString() : null;
+    const timezone = form.timeZone || 'Karachi';
+    try {
+      const res = await updatePromotion({ id, startsAt, endsAt, timezone }).unwrap();
+      setSchedule({ id: Date.now(), startDate: startsAt, endDate: endsAt, timeZone: timezone });
+      reset();
+      setShowModal(false);
+      showDialogue('success', res?.i18n_key || 'Success', res?.message || 'Schedule updated successfully.');
+    } catch (e) {
+      showDialogue('error', 'Error', e?.data?.message || 'Failed to update schedule.');
+    }
   };
 
   const handleCancel = () => {
@@ -37,12 +60,25 @@ export default function DiscountScheduleTab() {
     setShowModal(true);
   };
 
+  const toInputLocal = (iso) => {
+    if (!iso) return '';
+    const d = new Date(iso);
+    const pad = (n) => String(n).padStart(2, '0');
+    const yyyy = d.getFullYear();
+    const mm = pad(d.getMonth() + 1);
+    const dd = pad(d.getDate());
+    const hh = pad(d.getHours());
+    const mi = pad(d.getMinutes());
+    return `${yyyy}-${mm}-${dd}T${hh}:${mi}`;
+  };
+
   const openEdit = () => {
-    if (!schedule) return;
+    const src = schedule || backendSchedule;
+    if (!src) return;
     setForm({
-      startDate: schedule.startDate || '',
-      endDate: schedule.endDate || '',
-      timeZone: schedule.timeZone || 'Karachi',
+      startDate: toInputLocal(src.startDate),
+      endDate: toInputLocal(src.endDate),
+      timeZone: src.timeZone || 'Karachi',
     });
     setShowModal(true);
   };
@@ -51,7 +87,7 @@ export default function DiscountScheduleTab() {
     <div>
       <div className="flex items-center justify-between mb-4">
         <h3 className="text-lg font-medium text-neutral-900">Discount Schedule</h3>
-        {!schedule ? (
+        {(!schedule && !hasBackendSchedule) ? (
           <button
             onClick={openAdd}
             className="px-4 py-2 bg-primary-600 text-white rounded-full hover:bg-primary-700 text-sm font-medium"
@@ -70,24 +106,24 @@ export default function DiscountScheduleTab() {
         )}
       </div>
 
-      {!schedule && (
+      {(!schedule && !hasBackendSchedule) && (
         <div className="bg-white rounded-lg border border-neutral-200 p-6 text-sm text-neutral-500 text-center">No schedules added yet.</div>
       )}
 
-      {schedule && (
+      {(schedule || hasBackendSchedule) && (
         <div className="bg-white rounded-lg border border-neutral-200 p-6">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
               <div className="text-sm text-neutral-500">Start Date</div>
-              <div className="text-neutral-900 font-medium">{new Date(schedule.startDate).toLocaleString()}</div>
+              <div className="text-neutral-900 font-medium">{new Date((schedule?.startDate || backendSchedule?.startDate)).toLocaleString()}</div>
             </div>
             <div>
               <div className="text-sm text-neutral-500">End Date</div>
-              <div className="text-neutral-900 font-medium">{new Date(schedule.endDate).toLocaleString()}</div>
+              <div className="text-neutral-900 font-medium">{new Date((schedule?.endDate || backendSchedule?.endDate)).toLocaleString()}</div>
             </div>
             <div>
               <div className="text-sm text-neutral-500">Time Zone</div>
-              <div className="text-neutral-900 font-medium">{schedule.timeZone}</div>
+              <div className="text-neutral-900 font-medium">{(schedule?.timeZone || backendSchedule?.timeZone)}</div>
             </div>
           </div>
         </div>
@@ -130,7 +166,7 @@ export default function DiscountScheduleTab() {
 
             <div className="flex justify-end gap-3 mt-6">
               <button onClick={handleCancel} className="px-4 py-2 bg-white border border-neutral-300 text-neutral-700 rounded-full hover:bg-neutral-50 text-sm font-medium">Cancel</button>
-              <button onClick={() => setShowConfirm(true)} disabled={!canSave} className={`px-4 py-2 rounded-full text-sm font-medium ${canSave ? 'bg-primary-600 text-white hover:bg-primary-700' : 'bg-neutral-300 text-neutral-600 cursor-not-allowed'}`}>Save</button>
+              <button onClick={() => setShowConfirm(true)} disabled={!canSave || updating} className={`px-4 py-2 rounded-full text-sm font-medium ${canSave && !updating ? 'bg-primary-600 text-white hover:bg-primary-700' : 'bg-neutral-300 text-neutral-600 cursor-not-allowed'}`}>Save</button>
             </div>
           </div>
         </div>
@@ -150,6 +186,13 @@ export default function DiscountScheduleTab() {
           isCommentRequired={true}
         />
       )}
+      <DialogueBox
+        isOpen={dialogueBox.isOpen}
+        onClose={closeDialogue}
+        type={dialogueBox.type}
+        title={dialogueBox.title}
+        message={dialogueBox.message}
+      />
     </div>
   );
 }

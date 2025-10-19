@@ -1,5 +1,8 @@
 import React, { useMemo, useState } from 'react';
+import { useParams } from 'react-router-dom';
 import ConfirmationModal from '../../../../components/ConfirmationModal';
+import DialogueBox from '../../../../components/DialogueBox';
+import { useUpdatePromotionTargetsMutation } from '../../../../store/api/modules/discounts/discountsApi';
 
 // Mock kitchens and dishes
 const KITCHENS = [
@@ -19,11 +22,18 @@ const DISHES = [
 ];
 
 const PromotionTargetTab = () => {
+  const { id } = useParams();
   const [showModal, setShowModal] = useState(false);
   const [applyAllKitchens, setApplyAllKitchens] = useState(true);
   const [selectedKitchenIds, setSelectedKitchenIds] = useState([]);
   const [kitchenSelect, setKitchenSelect] = useState('');
   const [targets, setTargets] = useState([]); // [{id, kitchenId, kitchenName, dishes: [dishIds], status}]
+  const [dialogueBox, setDialogueBox] = useState({ isOpen: false, type: 'success', title: '', message: '' });
+  const showDialogue = (type, title, message) => setDialogueBox({ isOpen: true, type, title, message });
+  const closeDialogue = () => setDialogueBox({ isOpen: false, type: 'success', title: '', message: '' });
+  const [updateTargets, { isLoading: savingTargets }] = useUpdatePromotionTargetsMutation();
+  const [showAddConfirm, setShowAddConfirm] = useState(false);
+  const [addConfirmComment, setAddConfirmComment] = useState('');
 
   // Assign dishes modal
   const [assignForKitchen, setAssignForKitchen] = useState(null); // { kitchenId, kitchenName }
@@ -43,17 +53,38 @@ const PromotionTargetTab = () => {
 
   const handleSave = () => {
     if (!canSave) return;
-    if (applyAllKitchens) {
-      // Represent as a single special row
-      setTargets([{ id: 'all', all: true, applyAllDishes: true, dishes: [], status: 'Draft' }]);
-    } else {
-      const rows = selectedKitchenIds.map((kid) => {
-        const k = KITCHENS.find((x) => x.id === Number(kid));
-        return { id: `${kid}-${Date.now()}`, kitchenId: Number(kid), kitchenName: k?.name || `Kitchen ${kid}`, dishes: [], applyAllDishes: true, status: 'Draft' };
-      });
-      setTargets(rows);
+    if (!id) {
+      showDialogue('error', 'Error', 'Missing promotion id in URL.');
+      return;
     }
-    resetAndClose();
+    // Show confirm, then close the add modal to avoid flicker
+    setShowAddConfirm(true);
+    setShowModal(false);
+  };
+
+  const confirmCreateTargets = async () => {
+    try {
+      if (applyAllKitchens && id) {
+        const body = { targets: [ { applyToAllKitchen: true } ] };
+        const res = await updateTargets({ id, body }).unwrap();
+        // Update UI locally
+        setTargets([{ id: 'all', all: true, applyAllDishes: true, dishes: [], status: 'Draft' }]);
+        resetAndClose();
+        setAddConfirmComment('');
+        showDialogue('success', res?.i18n_key || 'Success', res?.message || 'Promotion targets updated successfully.');
+      } else {
+        // Fallback: local-only behavior for non-all case (API shape not specified)
+        const rows = selectedKitchenIds.map((kid) => {
+          const k = KITCHENS.find((x) => x.id === Number(kid));
+          return { id: `${kid}-${Date.now()}`, kitchenId: Number(kid), kitchenName: k?.name || `Kitchen ${kid}`, dishes: [], applyAllDishes: true, status: 'Draft' };
+        });
+        setTargets(rows);
+        resetAndClose();
+        setAddConfirmComment('');
+      }
+    } catch (e) {
+      showDialogue('error', 'Error', e?.data?.message || 'Failed to update promotion targets.');
+    }
   };
 
   const openAssignDishes = (kitchen) => {
@@ -355,7 +386,7 @@ const PromotionTargetTab = () => {
 
             <div className="flex justify-end gap-3 mt-6">
               <button onClick={resetAndClose} className="px-4 py-2 bg-white border border-neutral-300 text-neutral-700 rounded-full hover:bg-neutral-50 text-sm font-medium">Cancel</button>
-              <button onClick={handleSave} disabled={!canSave} className={`px-4 py-2 rounded-full text-sm font-medium ${canSave ? 'bg-primary-600 text-white hover:bg-primary-700' : 'bg-neutral-300 text-neutral-600 cursor-not-allowed'}`}>Save</button>
+              <button onClick={handleSave} disabled={!canSave || savingTargets} className={`px-4 py-2 rounded-full text-sm font-medium ${canSave && !savingTargets ? 'bg-primary-600 text-white hover:bg-primary-700' : 'bg-neutral-300 text-neutral-600 cursor-not-allowed'}`}>Save</button>
             </div>
           </div>
         </div>
@@ -404,6 +435,22 @@ const PromotionTargetTab = () => {
           onConfirm={() => { setShowStatusConfirm(false); applyStatusChange(); setStatusComment(''); }}
           onCancel={() => { setShowStatusConfirm(false); setStatusComment(''); }}
           confirmButtonText="Apply"
+          confirmButtonColor="primary"
+          isCommentRequired={true}
+        />
+      )}
+
+      {/* Create Targets Confirmation */}
+      {showAddConfirm && (
+        <ConfirmationModal
+          isOpen={showAddConfirm}
+          title={applyAllKitchens ? 'Create Promotion Targets (All Kitchens)' : 'Create Promotion Targets'}
+          message={applyAllKitchens ? 'This will apply to all kitchens.' : 'Proceed with selected kitchens?'}
+          comment={addConfirmComment}
+          onCommentChange={setAddConfirmComment}
+          onConfirm={() => { setShowAddConfirm(false); confirmCreateTargets(); }}
+          onCancel={() => { setShowAddConfirm(false); }}
+          confirmButtonText={savingTargets ? 'Saving...' : 'Create'}
           confirmButtonColor="primary"
           isCommentRequired={true}
         />
@@ -494,6 +541,14 @@ const PromotionTargetTab = () => {
           </div>
         </div>
       )}
+
+      <DialogueBox
+        isOpen={dialogueBox.isOpen}
+        onClose={closeDialogue}
+        type={dialogueBox.type}
+        title={dialogueBox.title}
+        message={dialogueBox.message}
+      />
     </div>
   );
 };

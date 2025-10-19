@@ -1,5 +1,6 @@
-import React, { useState } from 'react';
-import { Link, useParams, useNavigate } from 'react-router-dom';
+import React, { useEffect, useMemo, useState } from 'react';
+import { useParams, useLocation, useNavigate } from 'react-router-dom';
+import { useUpdatePromotionMutation, useLazyGetPromotionByIdQuery } from '../../../store/api/modules/discounts/discountsApi';
 import { ArrowLeftIcon, PencilIcon, XMarkIcon } from '@heroicons/react/24/outline';
 import DialogueBox from '../../../components/DialogueBox';
 import ConfirmationModal from '../../../components/ConfirmationModal';
@@ -13,27 +14,51 @@ import DiscountUsageTab from './tabs/DiscountUsageTab';
 
 const DiscountDetail = () => {
   const { id } = useParams();
+  const location = useLocation();
   const navigate = useNavigate();
 
   // Placeholder discount data; replace with RTK Query later
   const [discount, setDiscount] = useState({
-    id,
-    name: 'Sample Promotion',
-    idea: '20% off for weekend orders',
-    type: 'percentage',
-    status: 'draft',
+    id: id,
+    name: 'Promotion Name',
+    internalName: '',
+    campaignLabel: '',
+    idea: '',
+    type: 'standard',
     startDate: new Date().toISOString(),
-    endDate: new Date(Date.now() + 7*24*60*60*1000).toISOString(),
+    endDate: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(),
+    status: 'draft',
+    internalDescription: '',
   });
+
+  useEffect(() => {
+    const promotion = location.state && location.state.promotion;
+    if (promotion) {
+      setDiscount((prev) => ({
+        ...prev,
+        id: promotion.id || prev.id,
+        name: promotion.nameDisplay || prev.name,
+        internalName: promotion.nameInternal ?? prev.internalName,
+        campaignLabel: promotion.campaignLabel ?? prev.campaignLabel,
+        type: promotion.promotionType ?? prev.type,
+        status: promotion.status ?? prev.status,
+        internalDescription: promotion.descriptionInternal ?? prev.internalDescription,
+      }));
+    }
+  }, [location.state]);
 
   const [dialogueBox, setDialogueBox] = useState({ isOpen: false, type: 'success', title: '', message: '' });
   const showDialogue = (type, title, message) => setDialogueBox({ isOpen: true, type, title, message });
   const closeDialogue = () => setDialogueBox({ isOpen: false, type: 'success', title: '', message: '' });
 
+  const [updatePromotion, { isLoading: updating }] = useUpdatePromotionMutation();
+  const [triggerGetPromotionById] = useLazyGetPromotionByIdQuery();
+
   const [activeTab, setActiveTab] = useState('eligibility');
   const [showEditModal, setShowEditModal] = useState(false);
   const [editForm, setEditForm] = useState({ nameDisplay: '', nameInternal: '', campaignLabel: '', descriptionInternal: '', promotionType: 'standard' });
   const [showEditConfirm, setShowEditConfirm] = useState(false);
+  const [editConfirmComment, setEditConfirmComment] = useState('');
 
   const TABS = {
     eligibility: <EligibilityRuleTab />,
@@ -46,6 +71,28 @@ const DiscountDetail = () => {
   };
 
   const formatDate = (iso) => new Date(iso).toLocaleDateString();
+
+  // Pre-fetch promotion details for heavy tabs to ensure freshest data (financial, schedule, usage)
+  useEffect(() => {
+    const tabsNeedingDetails = new Set(['financial', 'schedule', 'usage']);
+    if (tabsNeedingDetails.has(activeTab) && id) {
+      (async () => {
+        try {
+          await triggerGetPromotionById(id).unwrap();
+        } catch (e) {
+          showDialogue('error', 'Error', e?.data?.message || 'Failed to fetch promotion details.');
+        }
+      })();
+    }
+  }, [activeTab, id, triggerGetPromotionById]);
+
+  // Also fetch once on mount to warm cache
+  useEffect(() => {
+    if (id) {
+      triggerGetPromotionById(id).unwrap().catch(() => {});
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   return (
     <div className="bg-white shadow rounded-xl overflow-hidden">
@@ -84,12 +131,20 @@ const DiscountDetail = () => {
       <div className="px-6 py-5 border-b border-neutral-200 grid grid-cols-1 md:grid-cols-2 gap-6">
         <div>
           <div className="mb-2">
+            <h3 className="text-sm font-medium text-neutral-500">Name Display</h3>
+            <p className="mt-1 text-neutral-900">{discount.name || '-'}</p>
+          </div>
+          <div className="mb-2">
             <h3 className="text-sm font-medium text-neutral-500">Name Internal</h3>
             <p className="mt-1 text-neutral-900">{discount.internalName || '-'}</p>
           </div>
           <div className="mb-2">
             <h3 className="text-sm font-medium text-neutral-500">Campaign Label</h3>
             <p className="mt-1 text-neutral-900">{discount.campaignLabel || '-'}</p>
+          </div>
+          <div className="mb-2">
+            <h3 className="text-sm font-medium text-neutral-500">Status</h3>
+            <p className="mt-1 text-neutral-900">{discount.status || '-'}</p>
           </div>
           <div className="mb-2">
             <h3 className="text-sm font-medium text-neutral-500">Description Internal</h3>
@@ -180,15 +235,16 @@ const DiscountDetail = () => {
                   <option value="voucher">Voucher</option>
                 </select>
               </div>
-            </div>
-            <div className="flex justify-end space-x-3 mt-6">
-              <button onClick={() => setShowEditModal(false)} className="px-4 py-2 bg-white border border-neutral-300 text-neutral-700 rounded-full hover:bg-neutral-50 text-sm font-medium">Cancel</button>
-              <button
-                onClick={() => setShowEditConfirm(true)}
-                className="px-4 py-2 bg-primary-600 text-white rounded-full hover:bg-primary-700 text-sm font-medium"
-              >
-                Save
-              </button>
+              <div className="flex justify-end space-x-3 mt-6">
+                <button onClick={() => setShowEditModal(false)} className="px-4 py-2 bg-white border border-neutral-300 text-neutral-700 rounded-full hover:bg-neutral-50 text-sm font-medium">Cancel</button>
+                <button
+                  onClick={() => setShowEditConfirm(true)}
+                  disabled={updating}
+                  className="px-4 py-2 bg-primary-600 text-white rounded-full hover:bg-primary-700 text-sm font-medium"
+                >
+                  Save Changes
+                </button>
+              </div>
             </div>
           </div>
         </div>
@@ -201,21 +257,40 @@ const DiscountDetail = () => {
           message="Are you sure you want to update this promotion?"
           confirmText="Update"
           cancelText="Cancel"
-          onConfirm={() => {
-            setShowEditConfirm(false);
-            // locally update the detail header fields; wire to API later
-            setDiscount((prev) => ({
-              ...prev,
-              name: editForm.nameDisplay || prev.name,
-              internalName: editForm.nameInternal,
-              campaignLabel: editForm.campaignLabel,
-              internalDescription: editForm.descriptionInternal,
-              type: editForm.promotionType || prev.type,
-            }));
-            setShowEditModal(false);
+          onConfirm={async () => {
+            try {
+              setShowEditConfirm(false);
+              const payload = {
+                id,
+                nameDisplay: editForm.nameDisplay,
+                campaignLabel: editForm.campaignLabel,
+                descriptionInternal: editForm.descriptionInternal,
+                promotionType: editForm.promotionType,
+                nameInternal: editForm.nameInternal,
+              };
+              const res = await updatePromotion(payload).unwrap();
+              const data = res?.data || {};
+              setDiscount((prev) => ({
+                ...prev,
+                name: data.nameDisplay ?? editForm.nameDisplay ?? prev.name,
+                internalName: data.nameInternal ?? editForm.nameInternal ?? prev.internalName,
+                campaignLabel: data.campaignLabel ?? editForm.campaignLabel ?? prev.campaignLabel,
+                internalDescription: data.descriptionInternal ?? editForm.descriptionInternal ?? prev.internalDescription,
+                type: data.promotionType ?? editForm.promotionType ?? prev.type,
+                status: data.status ?? prev.status,
+              }));
+              setShowEditModal(false);
+              setEditConfirmComment('');
+              showDialogue('success', res?.i18n_key || 'Updated', res?.message || 'Promotion updated successfully.');
+            } catch (e) {
+              setEditConfirmComment('');
+              showDialogue('error', 'Error', e?.data?.message || 'Failed to update promotion.');
+            }
           }}
-          onCancel={() => setShowEditConfirm(false)}
-          isCommentRequired={false}
+          onCancel={() => { setShowEditConfirm(false); setEditConfirmComment(''); }}
+          comment={editConfirmComment}
+          onCommentChange={setEditConfirmComment}
+          isCommentRequired={true}
         />
       )}
     </div>
