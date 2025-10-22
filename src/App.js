@@ -36,6 +36,10 @@ import FeedbackDetail from './pages/feedbacks/FeedbackDetail';
 // Dish Management
 import DishesList from './pages/dishes/DishesList';
 import DishDetail from './pages/dishes/DishDetail';
+// Case Management
+import MyCasesList from './pages/cases/MyCasesList';
+import AllCasesList from './pages/cases/AllCasesList';
+import CaseDetailPage from './pages/cases/CaseDetail/CaseDetailPage';
 // Protected Route Components
 import ProtectedRoute from './components/ProtectedRoute';
 import KitchenDishDetailPage from './pages/kitchens/KitchenDishDetailPage';
@@ -186,6 +190,24 @@ function App() {
             <Route path="/discounts/:id" element={
               <ProtectedRoute routeName="discounts">
                 <DiscountDetail />
+              </ProtectedRoute>
+            } />
+
+            {/* Case Management */}
+            <Route path="/cases" element={<Navigate to="/cases/my" replace />} />
+            <Route path="/cases/my" element={
+              <ProtectedRoute routeName="cases">
+                <MyCasesList />
+              </ProtectedRoute>
+            } />
+            <Route path="/cases/all" element={
+              <ProtectedRoute routeName="cases">
+                <AllCasesList />
+              </ProtectedRoute>
+            } />
+            <Route path="/cases/:id" element={
+              <ProtectedRoute routeName="cases">
+                <CaseDetailPage />
               </ProtectedRoute>
             } />
             

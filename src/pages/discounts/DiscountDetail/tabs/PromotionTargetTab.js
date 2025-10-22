@@ -2,7 +2,8 @@ import React, { useMemo, useState } from 'react';
 import { useParams } from 'react-router-dom';
 import ConfirmationModal from '../../../../components/ConfirmationModal';
 import DialogueBox from '../../../../components/DialogueBox';
-import { useUpdatePromotionTargetsMutation } from '../../../../store/api/modules/discounts/discountsApi';
+import { useUpdatePromotionTargetsMutation, useGetPromotionTargetsListQuery } from '../../../../store/api/modules/discounts/discountsApi';
+import { EllipsisVerticalIcon } from '@heroicons/react/24/outline';
 
 // Mock kitchens and dishes
 const KITCHENS = [
@@ -14,6 +15,7 @@ const KITCHENS = [
 ];
 
 const DISHES = [
+  
   { id: 101, name: 'Karahi' },
   { id: 102, name: 'Chicken Roast' },
   { id: 103, name: 'Baryani' },
@@ -34,11 +36,39 @@ const PromotionTargetTab = () => {
   const [updateTargets, { isLoading: savingTargets }] = useUpdatePromotionTargetsMutation();
   const [showAddConfirm, setShowAddConfirm] = useState(false);
   const [addConfirmComment, setAddConfirmComment] = useState('');
+  const [currentRow, setCurrentRow] = useState(null);
+  const [showRemoveConfirm, setShowRemoveConfirm] = useState(false);
+  const [removeConfirmComment, setRemoveConfirmComment] = useState('');
+  const [showSendConfirm, setShowSendConfirm] = useState(false);
+  const [sendConfirmComment, setSendConfirmComment] = useState('');
+  const [openMenuFor, setOpenMenuFor] = useState(null); // promotionTargetId for menu
+  const [openMenuPos, setOpenMenuPos] = useState({ top: 0, left: 0 });
+  const handleOpenMenu = (e, row) => {
+    const rect = e.currentTarget.getBoundingClientRect();
+    const menuWidth = 176; // 44 * 4
+    const menuHeight = 176; // approx height for 4 items
+    const gap = 8;
+    const top = rect.top + window.scrollY - menuHeight - gap; // open upward
+    const left = rect.right + window.scrollX - menuWidth; // right align
+    setOpenMenuPos({ top, left });
+    setOpenMenuFor(openMenuFor === row.promotionTargetId ? null : row.promotionTargetId);
+  };
+
+  // Fetch targets list on tab mount and arg change
+  const { data: targetsResp, isLoading: targetsLoading, isFetching: targetsFetching, isUninitialized: targetsUninit, refetch: refetchTargets } = useGetPromotionTargetsListQuery(id, {
+    skip: !id,
+    refetchOnMountOrArgChange: true,
+    refetchOnFocus: true,
+    refetchOnReconnect: true,
+  });
 
   // Assign dishes modal
   const [assignForKitchen, setAssignForKitchen] = useState(null); // { kitchenId, kitchenName }
   const [availableDishes, setAvailableDishes] = useState(DISHES);
   const [selectedDishesForKitchen, setSelectedDishesForKitchen] = useState([]); // dishIds
+  const [assignStatusValue, setAssignStatusValue] = useState('Draft');
+  const [showAssignConfirm, setShowAssignConfirm] = useState(false);
+  const [assignConfirmComment, setAssignConfirmComment] = useState('');
 
   const canSave = useMemo(() => {
     if (applyAllKitchens) return true;
@@ -72,6 +102,7 @@ const PromotionTargetTab = () => {
         resetAndClose();
         setAddConfirmComment('');
         showDialogue('success', res?.i18n_key || 'Success', res?.message || 'Promotion targets updated successfully.');
+        await refetchTargets();
       } else {
         // Fallback: local-only behavior for non-all case (API shape not specified)
         const rows = selectedKitchenIds.map((kid) => {
@@ -193,121 +224,92 @@ const PromotionTargetTab = () => {
       </div>
 
       <div className="bg-white rounded-lg border border-neutral-200 overflow-hidden">
+        { (targetsUninit || targetsLoading || targetsFetching) ? (
+          <div className="p-10">
+            <div className="flex items-center justify-center">
+              <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-primary-500"></div>
+            </div>
+          </div>
+        ) : (
         <div className="overflow-x-auto">
           <table className="min-w-full divide-y divide-neutral-200">
             <thead className="bg-neutral-50">
               <tr>
-                <th className="px-6 py-3 text-left text-xs font-medium text-neutral-500 uppercase tracking-wider">Target</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-neutral-500 uppercase tracking-wider">Target ID</th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-neutral-500 uppercase tracking-wider">Dishes</th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-neutral-500 uppercase tracking-wider">Status</th>
                 <th className="px-6 py-3 text-right text-xs font-medium text-neutral-500 uppercase tracking-wider">Actions</th>
               </tr>
             </thead>
             <tbody className="bg-white divide-y divide-neutral-200">
-              {targets.length === 0 && (
+              {(!targetsResp?.data?.targets || targetsResp.data.targets.length === 0) && (
                 <tr>
                   <td colSpan={4} className="px-6 py-6 text-sm text-neutral-500 text-center">No targets added yet.</td>
                 </tr>
               )}
 
-              {/* All Kitchens Row */}
-              {targets.length > 0 && targets[0].all && (
-                <tr>
-                  <td className="px-6 py-4 text-sm text-neutral-900">All Kitchens</td>
-                  <td className="px-6 py-4 text-sm text-neutral-900">
-                    {targets[0].applyAllDishes ? (
-                      <span>All dishes</span>
-                    ) : targets[0].dishes.length === 0 ? (
-                      <span className="text-neutral-500">No dishes selected</span>
-                    ) : (
-                      <ul className="list-disc list-inside space-y-1">
-                        {targets[0].dishes.map((dishId) => {
-                          const d = DISHES.find((x) => x.id === dishId);
-                          return <li key={dishId}>{d?.name || `Dish ${dishId}`}</li>;
-                        })}
-                      </ul>
-                    )}
-                  </td>
-                  <td className="px-6 py-4 text-sm text-neutral-900">{targets[0].status || 'Draft'}</td>
-                  <td className="px-6 py-4 text-right text-sm font-medium space-x-3">
-                    <button
-                      onClick={() => openAssignDishes({ all: true, kitchenName: 'All Kitchens' })}
-                      className="text-primary-600 hover:text-primary-800"
-                    >
-                      Add Dish
-                    </button>
-                    <button
-                      onClick={() => submitTarget(targets[0].id)}
-                      className="text-primary-600 hover:text-primary-800"
-                    >
-                      Submit
-                    </button>
-                    <button
-                      onClick={() => openChangeStatus(targets[0])}
-                      className="text-primary-600 hover:text-primary-800"
-                    >
-                      Change Status
-                    </button>
-                    <button
-                      onClick={() => setTargets([])}
-                      className="text-primary-600 hover:text-primary-800"
-                    >
-                      Remove
-                    </button>
-                  </td>
-                </tr>
-              )}
-
-              {/* Selected Kitchens Rows */}
-              {targets.filter(t=>!t.all).map((t) => (
-                <tr key={t.id}>
-                  <td className="px-6 py-4 text-sm text-neutral-900">{t.kitchenName}</td>
-                  <td className="px-6 py-4 text-sm text-neutral-900">
-                    {t.applyAllDishes ? (
-                      <span>All dishes</span>
-                    ) : t.dishes.length === 0 ? (
-                      <span className="text-neutral-500">No dishes selected</span>
-                    ) : (
-                      <ul className="list-disc list-inside space-y-1">
-                        {t.dishes.map((dishId) => {
-                          const d = DISHES.find((x) => x.id === dishId);
-                          return <li key={dishId}>{d?.name || `Dish ${dishId}`}</li>;
-                        })}
-                      </ul>
-                    )}
-                  </td>
-                  <td className="px-6 py-4 text-sm text-neutral-900">{t.status || 'Draft'}</td>
-                  <td className="px-6 py-4 text-right text-sm font-medium space-x-3">
-                    <button
-                      onClick={() => openAssignDishes({ kitchenId: t.kitchenId, kitchenName: t.kitchenName })}
-                      className="text-primary-600 hover:text-primary-800"
-                    >
-                      Add Dish
-                    </button>
-                    <button
-                      onClick={() => submitTarget(t.id)}
-                      className="text-primary-600 hover:text-primary-800"
-                    >
-                      Submit
-                    </button>
-                    <button
-                      onClick={() => openChangeStatus(t)}
-                      className="text-primary-600 hover:text-primary-800"
-                    >
-                      Change Status
-                    </button>
-                    <button
-                      onClick={() => removeTarget(x => x.id === t.id)}
-                      className="text-primary-600 hover:text-primary-800"
-                    >
-                      Remove
-                    </button>
+      {/* Floating row actions menu */}
+      {openMenuFor && (
+        <div className="fixed inset-0 z-[70]" onClick={() => setOpenMenuFor(null)}>
+          <div
+            className="absolute w-44 rounded-md shadow-lg bg-white ring-1 ring-black ring-opacity-5"
+            style={{ top: openMenuPos.top, left: openMenuPos.left }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="py-1">
+              <button
+                className="w-full text-left px-4 py-2 text-sm text-neutral-700 hover:bg-neutral-50"
+                onClick={() => { const row = (targetsResp?.data?.targets || []).find(r => r.promotionTargetId === openMenuFor); setOpenMenuFor(null); if (row) openChangeStatus({ id: row.promotionTargetId, status: row.status }); }}
+              >
+                Change Status
+              </button>
+              <button
+                className="w-full text-left px-4 py-2 text-sm text-neutral-700 hover:bg-neutral-50"
+                onClick={() => { const row = (targetsResp?.data?.targets || []).find(r => r.promotionTargetId === openMenuFor); setOpenMenuFor(null); if (row) { setCurrentRow(row); setShowSendConfirm(true); } }}
+              >
+                Send to Kitchen
+              </button>
+              <button
+                className="w-full text-left px-4 py-2 text-sm text-neutral-700 hover:bg-neutral-50"
+                onClick={() => { const row = (targetsResp?.data?.targets || []).find(r => r.promotionTargetId === openMenuFor); setOpenMenuFor(null); if (row) { openAssignDishes(row.applyToAllDishes ? { all: true, kitchenName: 'All Kitchens' } : { kitchenId: row.targetId, kitchenName: row.targetId }); } }}
+              >
+                Assign Dish
+              </button>
+              <button
+                className="w-full text-left px-4 py-2 text-sm text-red-600 hover:bg-red-50"
+                onClick={() => { const row = (targetsResp?.data?.targets || []).find(r => r.promotionTargetId === openMenuFor); setOpenMenuFor(null); if (row) { setCurrentRow(row); setShowRemoveConfirm(true); } }}
+              >
+                Delete
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+              {(targetsResp?.data?.targets || []).map((t) => (
+                <tr key={t.promotionTargetId} className="relative">
+                  <td className="px-6 py-4 text-sm text-neutral-900">{t.targetId}</td>
+                  <td className="px-6 py-4 text-sm text-neutral-900">{t.applyToAllDishes ? 'All dishes' : '-'}</td>
+                  <td className="px-6 py-4 text-sm text-neutral-900">{t.status || '-'}</td>
+                  <td className="px-6 py-4 text-right text-sm font-medium">
+                    <div className="relative inline-block text-left">
+                      <button
+                        type="button"
+                        className="inline-flex items-center justify-center p-2 rounded-full hover:bg-neutral-100 text-neutral-700"
+                        onClick={(e) => handleOpenMenu(e, t)}
+                        aria-haspopup="menu"
+                        aria-expanded={openMenuFor === t.promotionTargetId}
+                      >
+                        <EllipsisVerticalIcon className="h-5 w-5" />
+                      </button>
+                      {/* menu rendered out of table to avoid clipping */}
+                    </div>
                   </td>
                 </tr>
               ))}
             </tbody>
           </table>
         </div>
+        )}
       </div>
 
       {/* Add Target Modal */}
@@ -440,6 +442,48 @@ const PromotionTargetTab = () => {
         />
       )}
 
+      {/* Send to Kitchen Confirmation */}
+      {showSendConfirm && (
+        <ConfirmationModal
+          isOpen={showSendConfirm}
+          title="Send Target to Kitchen"
+          message={`Send target ${currentRow?.targetId || ''} to kitchen?`}
+          comment={sendConfirmComment}
+          onCommentChange={setSendConfirmComment}
+          onConfirm={() => {
+            setShowSendConfirm(false);
+            setSendConfirmComment('');
+            // TODO: Wire API when provided
+            showDialogue('success', 'promotion.targets_send_requested', 'Send to kitchen requested (stub).');
+          }}
+          onCancel={() => { setShowSendConfirm(false); setSendConfirmComment(''); }}
+          confirmButtonText="Send"
+          confirmButtonColor="primary"
+          isCommentRequired={true}
+        />
+      )}
+
+      {/* Remove Target Confirmation */}
+      {showRemoveConfirm && (
+        <ConfirmationModal
+          isOpen={showRemoveConfirm}
+          title="Remove Promotion Target"
+          message={`Are you sure you want to remove target ${currentRow?.targetId || ''}?`}
+          comment={removeConfirmComment}
+          onCommentChange={setRemoveConfirmComment}
+          onConfirm={() => {
+            setShowRemoveConfirm(false);
+            setRemoveConfirmComment('');
+            // TODO: Wire API when provided
+            showDialogue('success', 'promotion.targets_remove_requested', 'Remove target requested (stub).');
+          }}
+          onCancel={() => { setShowRemoveConfirm(false); setRemoveConfirmComment(''); }}
+          confirmButtonText="Remove"
+          confirmButtonColor="danger"
+          isCommentRequired={true}
+        />
+      )}
+
       {/* Create Targets Confirmation */}
       {showAddConfirm && (
         <ConfirmationModal
@@ -456,10 +500,10 @@ const PromotionTargetTab = () => {
         />
       )}
 
-      {/* Assign Dishes Modal (dual list) */}
+      
       {showAssignModal && assignForKitchen && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-xl shadow-lg max-w-4xl w-full h-[90vh] flex flex-col">
+        <div className={`fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center ${showAssignConfirm ? 'z-40' : 'z-50'} p-4`}>
+          <div className="bg-white rounded-xl shadow-lg max-w-4xl w-full max-h-[90vh] flex flex-col overflow-hidden">
             {/* Modal Header */}
             <div className="flex justify-between items-center p-6 pb-4 border-b border-gray-200 flex-shrink-0">
               <h3 className="text-lg font-medium text-neutral-900">Assign Dishes</h3>
@@ -467,13 +511,14 @@ const PromotionTargetTab = () => {
             </div>
 
             {/* Modal Content */}
-            <div className="flex-1 p-6">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6 h-[300px]">
+            <div className="flex-1 p-6 overflow-y-auto">
+              
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 {/* Available Dishes */}
                 <div className="flex flex-col">
                   <h4 className="text-sm font-medium text-gray-700 mb-3">Available Dishes</h4>
                   <div
-                    className="border-2 border-dashed border-gray-300 rounded-lg p-4 bg-gray-50 h-[300px] overflow-y-auto"
+                    className="border-2 border-dashed border-gray-300 rounded-lg p-4 bg-gray-50 h-64 md:h-80 overflow-y-auto"
                     onDragOver={handleDragOver}
                     onDrop={handleDropToAvailable}
                   >
@@ -496,7 +541,7 @@ const PromotionTargetTab = () => {
                 <div className="flex flex-col">
                   <h4 className="text-sm font-medium text-gray-700 mb-3">Selected Dishes</h4>
                   <div
-                    className="border-2 border-dashed border-primary-300 rounded-lg p-4 bg-primary-50 h-[300px] overflow-y-auto"
+                    className="border-2 border-dashed border-primary-300 rounded-lg p-4 bg-primary-50 h-64 md:h-80 overflow-y-auto"
                     onDragOver={handleDragOver}
                     onDrop={handleDropToSelected}
                   >
@@ -526,13 +571,15 @@ const PromotionTargetTab = () => {
             {/* Modal Footer */}
             <div className="flex justify-end space-x-3 p-6 pt-4 border-t border-gray-200 flex-shrink-0">
               <button
+                type="button"
                 onClick={() => setShowAssignModal(false)}
                 className="px-4 py-2 bg-white border border-neutral-300 text-neutral-700 rounded-full hover:bg-neutral-50 transition-colors text-sm font-medium"
               >
                 Cancel
               </button>
               <button
-                onClick={saveAssignedDishes}
+                type="button"
+                onClick={() => { setShowAssignConfirm(true); }}
                 className="px-4 py-2 bg-primary-600 text-white rounded-full hover:bg-primary-700 transition-colors text-sm font-medium"
               >
                 Save
@@ -540,6 +587,28 @@ const PromotionTargetTab = () => {
             </div>
           </div>
         </div>
+      )}
+
+      {/* Assign Save Confirmation */}
+      {showAssignConfirm && (
+        <ConfirmationModal
+          isOpen={showAssignConfirm}
+          title="Save Target Changes"
+          message="This will update assigned dishes and status for the selected target."
+          comment={assignConfirmComment}
+          onCommentChange={setAssignConfirmComment}
+          onConfirm={() => {
+            setShowAssignConfirm(false);
+            setAssignConfirmComment('');
+            // Apply assigned dishes change
+            saveAssignedDishes();
+            showDialogue('success', 'promotion.targets_updated', 'Target updated successfully.');
+          }}
+          onCancel={() => { setShowAssignConfirm(false); setAssignConfirmComment(''); }}
+          confirmButtonText="Save"
+          confirmButtonColor="primary"
+          isCommentRequired={true}
+        />
       )}
 
       <DialogueBox

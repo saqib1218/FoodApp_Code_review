@@ -28,6 +28,7 @@ import {
 const MainLayout = () => {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [showActionButtons, setShowActionButtons] = useState(false);
+  const [casesOpen, setCasesOpen] = useState(false);
   const { currentUser, logout } = useAuth();
   const { hasPermission, isPermissionsLoaded } = usePermissions();
   const navigate = useNavigate();
@@ -51,6 +52,8 @@ const MainLayout = () => {
       location.pathname.startsWith(screen));
     
     setShowActionButtons(isModeration);
+    // Auto-open Case Management submenu when on /cases routes
+    setCasesOpen(location.pathname.startsWith('/cases'));
   }, [location]);
 
   // Define navigation items with required permissions (using database permission keys)
@@ -66,6 +69,7 @@ const MainLayout = () => {
     { name: 'Feedback', href: '/feedback', icon: ChatBubbleBottomCenterTextIcon, permission: 'admin.feedback.view' },
     { name: 'Permissions Demo', href: '/permissions-demo', icon: ShieldCheckIcon, permission: null }, // Demo page for RBAC
     { name: 'Discounts', href: '/discounts', icon: TagIcon, permission: 'admin.discount.view' },
+    { name: 'Case Management', href: '/cases', icon: QueueListIcon, permission: null },
     { name: 'Users', href: '/users', icon: UserGroupIcon, permission: 'admin.users.view' },
     { name: 'Reports', href: '/reports', icon: ChartBarIcon, permission: 'admin.reports.view' },
     { name: 'Settings', href: '/settings', icon: Cog6ToothIcon, permission: 'admin.setting.view' },
@@ -120,21 +124,58 @@ const MainLayout = () => {
             </div>
             <nav className="mt-5 px-2 space-y-1">
               {filteredNavigation.map((item) => (
-                <NavLink
-                  key={item.name}
-                  to={item.href}
-                  className={({ isActive }) =>
-                    isActive
-                      ? 'bg-primary-700 text-white group flex items-center px-2 py-2 text-base font-medium rounded-md'
-                      : 'text-white hover:bg-primary-500 group flex items-center px-2 py-2 text-base font-medium rounded-md'
-                  }
-                >
-                  <item.icon
-                    className="mr-4 flex-shrink-0 h-6 w-6 text-primary-200"
-                    aria-hidden="true"
-                  />
-                  {item.name}
-                </NavLink>
+                item.href === '/cases' ? (
+                  <div key={item.name} className="space-y-1">
+                    <button
+                      type="button"
+                      onClick={() => setCasesOpen((v) => !v)}
+                      className={`$${' '}group flex w-full items-center px-2 py-2 text-base font-medium rounded-md ${casesOpen || location.pathname.startsWith('/cases') ? 'bg-primary-700 text-white' : 'text-white hover:bg-primary-500'}`}
+                    >
+                      <item.icon className="mr-4 flex-shrink-0 h-6 w-6 text-primary-200" aria-hidden="true" />
+                      Case Management
+                    </button>
+                    {casesOpen && (
+                      <div className="ml-10 space-y-1">
+                        <NavLink
+                          to="/cases/my"
+                          className={({ isActive }) =>
+                            isActive
+                              ? 'bg-primary-700 text-white group flex items-center px-2 py-2 text-base font-medium rounded-md'
+                              : 'text-white/90 hover:bg-primary-500 group flex items-center px-2 py-2 text-base font-medium rounded-md'
+                          }
+                        >
+                          My Cases
+                        </NavLink>
+                        <NavLink
+                          to="/cases/all"
+                          className={({ isActive }) =>
+                            isActive
+                              ? 'bg-primary-700 text-white group flex items-center px-2 py-2 text-base font-medium rounded-md'
+                              : 'text-white/90 hover:bg-primary-500 group flex items-center px-2 py-2 text-base font-medium rounded-md'
+                          }
+                        >
+                          All Cases
+                        </NavLink>
+                      </div>
+                    )}
+                  </div>
+                ) : (
+                  <NavLink
+                    key={item.name}
+                    to={item.href}
+                    className={({ isActive }) =>
+                      isActive
+                        ? 'bg-primary-700 text-white group flex items-center px-2 py-2 text-base font-medium rounded-md'
+                        : 'text-white hover:bg-primary-500 group flex items-center px-2 py-2 text-base font-medium rounded-md'
+                    }
+                  >
+                    <item.icon
+                      className="mr-4 flex-shrink-0 h-6 w-6 text-primary-200"
+                      aria-hidden="true"
+                    />
+                    {item.name}
+                  </NavLink>
+                )
               ))}
             </nav>
           </div>
@@ -151,21 +192,58 @@ const MainLayout = () => {
               </div>
               <nav className="mt-5 flex-1 px-2 space-y-1">
                 {filteredNavigation.map((item) => (
-                  <NavLink
-                    key={item.name}
-                    to={item.href}
-                    className={({ isActive }) =>
-                      isActive
-                        ? 'bg-primary-700 text-white group flex items-center px-2 py-2 text-sm font-medium rounded-md'
-                        : 'text-white hover:bg-primary-500 group flex items-center px-2 py-2 text-sm font-medium rounded-md'
-                    }
-                  >
-                    <item.icon
-                      className="mr-3 flex-shrink-0 h-6 w-6 text-neutral-200"
-                      aria-hidden="true"
-                    />
-                    {item.name}
-                  </NavLink>
+                  item.href === '/cases' ? (
+                    <div key={item.name} className="space-y-1">
+                      <button
+                        type="button"
+                        onClick={() => setCasesOpen((v) => !v)}
+                        className={`${(casesOpen || location.pathname.startsWith('/cases')) ? 'bg-primary-700 text-white' : 'text-white hover:bg-primary-500'} group flex w-full items-center px-2 py-2 text-sm font-medium rounded-md`}
+                      >
+                        <item.icon className="mr-3 flex-shrink-0 h-6 w-6 text-neutral-200" aria-hidden="true" />
+                        Case Management
+                      </button>
+                      {casesOpen && (
+                        <div className="ml-10 space-y-1">
+                          <NavLink
+                            to="/cases/my"
+                            className={({ isActive }) =>
+                              isActive
+                                ? 'bg-primary-700 text-white group flex items-center px-2 py-2 text-sm font-medium rounded-md'
+                                : 'text-white/90 hover:bg-primary-500 group flex items-center px-2 py-2 text-sm font-medium rounded-md'
+                            }
+                          >
+                            My Cases
+                          </NavLink>
+                          <NavLink
+                            to="/cases/all"
+                            className={({ isActive }) =>
+                              isActive
+                                ? 'bg-primary-700 text-white group flex items-center px-2 py-2 text-sm font-medium rounded-md'
+                                : 'text-white/90 hover:bg-primary-500 group flex items-center px-2 py-2 text-sm font-medium rounded-md'
+                            }
+                          >
+                            All Cases
+                          </NavLink>
+                        </div>
+                      )}
+                    </div>
+                  ) : (
+                    <NavLink
+                      key={item.name}
+                      to={item.href}
+                      className={({ isActive }) =>
+                        isActive
+                          ? 'bg-primary-700 text-white group flex items-center px-2 py-2 text-sm font-medium rounded-md'
+                          : 'text-white hover:bg-primary-500 group flex items-center px-2 py-2 text-sm font-medium rounded-md'
+                      }
+                    >
+                      <item.icon
+                        className="mr-3 flex-shrink-0 h-6 w-6 text-neutral-200"
+                        aria-hidden="true"
+                      />
+                      {item.name}
+                    </NavLink>
+                  )
                 ))}
               </nav>
             </div>

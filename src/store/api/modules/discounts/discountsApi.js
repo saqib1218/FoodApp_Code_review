@@ -251,6 +251,11 @@ export const discountsApi = apiSlice.injectEndpoints({
         { type: 'PromotionTargets', id: arg.id },
       ],
     }),
+
+    getPromotionTargetsList: builder.query({
+      query: (id) => `/admin/promotions/${id}/targets`,
+      providesTags: (result, error, arg) => [{ type: 'PromotionTargets', id: arg }],
+    }),
   }),
 });
 
@@ -286,4 +291,5 @@ export const {
   useLazyGetPromotionCodeByIdQuery,
   useUpdatePromotionCodeMutation,
   useUpdatePromotionTargetsMutation,
+  useGetPromotionTargetsListQuery,
 } = discountsApi;

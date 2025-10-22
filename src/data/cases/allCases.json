@@ -1,0 +1,28 @@
+[
+  {
+    "caseId": "CASE-000010",
+    "subject": "ORDER: order-77701 - Delivery delayed by 2 days",
+    "category": "Logistics",
+    "type": "Complaint",
+    "subType": "Delay",
+    "status": "Open",
+    "priority": "HIGH",
+    "initiated": "2024-03-10",
+    "currentActor": "Ops Team",
+    "initiator": "Zara Khan",
+    "action": "customer"
+  },
+  {
+    "caseId": "CASE-000011",
+    "subject": "Refund processed confirmation for order-12349",
+    "category": "Finance",
+    "type": "Update",
+    "subType": "Refund",
+    "status": "Resolved",
+    "priority": "LOW",
+    "initiated": "2024-01-18",
+    "currentActor": "Finance",
+    "initiator": "System",
+    "action": "system"
+  }
+]

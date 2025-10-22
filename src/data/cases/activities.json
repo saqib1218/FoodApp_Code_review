@@ -1,0 +1,37 @@
+[
+  {
+    "caseId": "CASE-000005",
+    "type": "Assignment",
+    "timestamp": "2024-01-15T15:35:00",
+    "actor": "Admin User",
+    "details": "Case assigned to Sarah Johnson for investigation"
+  },
+  {
+    "caseId": "CASE-000005",
+    "type": "Contact Log",
+    "timestamp": "2024-01-15T16:00:00",
+    "actor": "Sarah Johnson",
+    "details": "Customer mentioned the food was cold upon delivery. Discussed compensation options."
+  },
+  {
+    "caseId": "CASE-000005",
+    "type": "Manual Note",
+    "timestamp": "2024-01-15T17:30:00",
+    "actor": "Sarah Johnson",
+    "details": "Checked with kitchen - they confirmed the food was prepared on time. Issue seems to be with delivery timing."
+  },
+  {
+    "caseId": "CASE-000005",
+    "type": "Priority Change",
+    "timestamp": "2024-01-15T18:00:00",
+    "actor": "Sarah Johnson",
+    "details": "Escalating priority as customer is a premium member"
+  },
+  {
+    "caseId": "CASE-000005",
+    "type": "Status Change",
+    "timestamp": "2024-01-15T19:20:00",
+    "actor": "Sarah Johnson",
+    "details": "Updated case status to in progress after initial investigation"
+  }
+]

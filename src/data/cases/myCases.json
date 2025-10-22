@@ -1,0 +1,28 @@
+[
+  {
+    "caseId": "CASE-000005",
+    "subject": "ORDER: order-12349\n\nCustomer inquiring about refund status for order cancelled 3 days ago.",
+    "category": "Customer Category",
+    "type": "Inquiry",
+    "subType": "Refund Request",
+    "status": "Initiated",
+    "priority": "MEDIUM",
+    "initiated": "2024-01-16",
+    "currentActor": "Unassigned",
+    "initiator": "Jane Smith",
+    "action": "customer"
+  },
+  {
+    "caseId": "CASE-000006",
+    "subject": "Payment issue on order-55521",
+    "category": "Payment",
+    "type": "Issue",
+    "subType": "Double Charge",
+    "status": "Open",
+    "priority": "HIGH",
+    "initiated": "2024-02-01",
+    "currentActor": "Support Agent",
+    "initiator": "Ali Khan",
+    "action": "customer"
+  }
+]
