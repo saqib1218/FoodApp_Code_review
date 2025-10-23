@@ -67,6 +67,7 @@ const MainLayout = () => {
     { name: 'Customers', href: '/customers', icon: UsersIcon, permission: 'admin.customer.view' },
     { name: 'Engagement', href: '/engagement', icon: ChatBubbleLeftRightIcon, permission: 'admin.engagement.view' },
     { name: 'Feedback', href: '/feedback', icon: ChatBubbleBottomCenterTextIcon, permission: 'admin.feedback.view' },
+    { name: 'Requests', href: '/requests', icon: QueueListIcon, permission: 'admin.request.view' },
     { name: 'Permissions Demo', href: '/permissions-demo', icon: ShieldCheckIcon, permission: null }, // Demo page for RBAC
     { name: 'Discounts', href: '/discounts', icon: TagIcon, permission: 'admin.discount.view' },
     { name: 'Case Management', href: '/cases', icon: QueueListIcon, permission: null },

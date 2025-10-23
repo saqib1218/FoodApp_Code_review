@@ -14,10 +14,18 @@ import {
   XMarkIcon
 } from '@heroicons/react/24/outline';
 import ConfirmationModal from '../../components/ConfirmationModal';
+import DialogueBox from '../../components/DialogueBox';
+import { usePermissions } from '../../hooks/usePermissions';
+import { useGetFeedbackByIdQuery, useUpdateFeedbackDetailsMutation, useSendFeedbackToKitchenMutation, useRejectFeedbackMutation, useDeleteFeedbackMediaMutation } from '../../store/api/modules/feedback/feedbackApi';
 
 const FeedbackDetail = () => {
   const { id } = useParams();
   const navigate = useNavigate();
+  const { hasPermission } = usePermissions();
+  const canEditFeedback = hasPermission('admin.feedback.edit');
+  const canSendToKitchen = hasPermission('admin.feedback.send.to.kitchen');
+  const canRejectFeedback = hasPermission('admin.feedback.reject');
+  const canDeleteMedia = hasPermission('admin.feedback.media.delete');
   const [feedback, setFeedback] = useState(null);
   const [loading, setLoading] = useState(true);
   const [showEditModal, setShowEditModal] = useState(false);
@@ -31,6 +39,9 @@ const FeedbackDetail = () => {
   const [updateComment, setUpdateComment] = useState('');
   const [sendToKitchenComment, setSendToKitchenComment] = useState('');
   const [editMediaFiles, setEditMediaFiles] = useState([]);
+  const [dialogueBox, setDialogueBox] = useState({ isOpen: false, type: 'success', title: '', message: '' });
+  const showDialogue = (type, title, message) => setDialogueBox({ isOpen: true, type, title, message });
+  const closeDialogue = () => setDialogueBox({ isOpen: false, type: 'success', title: '', message: '' });
 
   // Rejection reasons options
   const rejectionReasons = [
@@ -43,144 +54,36 @@ const FeedbackDetail = () => {
     'Other'
   ];
 
-  // Mock feedback data - in real app, this would come from API
-  const mockFeedbacks = [
-    {
-      id: 1,
-      customerName: 'Ahmed Hassan',
-      customerEmail: 'ahmed.hassan@email.com',
-      customerPhone: '+92 300 1234567',
-      customerId: 'CUST-001',
-      kitchenId: 'KITCHEN-001',
-      kitchenName: 'Pizza Palace',
-      dishId: 'DISH-001',
-      dishName: 'Chicken Tikka Pizza',
-      status: 'pending',
-      rating: 4,
-      feedback: 'Great taste but delivery was a bit late. Overall satisfied with the quality. The chicken tikka was perfectly cooked and the pizza base was crispy. However, the delivery took longer than expected which affected the overall experience. Would definitely order again if delivery time improves.',
-      createdAt: '2024-01-12 14:30:00',
-      orderNumber: 'ORD-2024-001',
-      orderDate: '2024-01-12 12:00:00',
-      orderTotal: 'PKR 1,250',
-      orderItems: [
-        { id: 1, name: 'Chicken Tikka Pizza', quantity: 1, price: 'PKR 1,250' }
-      ],
-      mediaFiles: [
-        {
-          id: 1,
-          type: 'image',
-          url: 'https://images.unsplash.com/photo-1565299624946-b28f40a0ca4b?w=400',
-          thumbnail: 'https://images.unsplash.com/photo-1565299624946-b28f40a0ca4b?w=200',
-          name: 'pizza_photo.jpg'
-        },
-        {
-          id: 2,
-          type: 'video',
-          url: 'https://sample-videos.com/zip/10/mp4/SampleVideo_1280x720_1mb.mp4',
-          thumbnail: 'https://images.unsplash.com/photo-1565299624946-b28f40a0ca4b?w=200',
-          name: 'pizza_video.mp4'
-        }
-      ]
-    },
-    {
-      id: 2,
-      customerName: 'Fatima Khan',
-      customerEmail: 'fatima.khan@email.com',
-      customerPhone: '+92 301 2345678',
-      customerId: 'CUST-002',
-      kitchenId: 'KITCHEN-002',
-      kitchenName: 'Burger House',
-      dishId: 'DISH-002',
-      dishName: 'Beef Burger Deluxe',
-      status: 'approved',
-      rating: 5,
-      feedback: 'Excellent burger! Perfect taste and very fresh ingredients. Highly recommended. The beef patty was juicy and cooked to perfection. The vegetables were fresh and the sauce complemented the burger very well. Packaging was also great and kept the burger warm.',
-      createdAt: '2024-01-11 18:45:00',
-      orderNumber: 'ORD-2024-002',
-      orderDate: '2024-01-11 17:30:00',
-      orderTotal: 'PKR 850',
-      orderItems: [
-        { id: 1, name: 'Beef Burger Deluxe', quantity: 1, price: 'PKR 850' }
-      ],
-      mediaFiles: [
-        {
-          id: 3,
-          type: 'image',
-          url: 'https://images.unsplash.com/photo-1568901346375-23c9450c58cd?w=400',
-          thumbnail: 'https://images.unsplash.com/photo-1568901346375-23c9450c58cd?w=200',
-          name: 'burger_photo.jpg'
-        }
-      ]
-    },
-    {
-      id: 3,
-      customerName: 'Sarah Ahmed',
-      customerPhone: '+92 302 3456789',
-      customerId: 'CUST-003',
-      kitchenId: 'KITCHEN-003',
-      kitchenName: 'Sushi Master',
-      dishId: 'DISH-003',
-      dishName: 'California Roll',
-      status: 'rejected',
-      rating: 2,
-      feedback: 'Not fresh, rice was hard and fish didn\'t taste good. Very disappointed. The sushi rice was overcooked and hard, making it difficult to eat. The fish seemed old and had an off taste. For the price paid, this was completely unacceptable. Would not recommend to anyone.',
-      createdAt: '2024-01-10 20:15:00',
-      orderNumber: 'ORD-2024-003',
-      orderTotal: 'PKR 1,800'
-    },
-    {
-      id: 4,
-      customerName: 'Ali Raza',
-      customerPhone: '+92 303 4567890',
-      customerId: 'CUST-004',
-      kitchenId: 'KITCHEN-001',
-      kitchenName: 'Pizza Palace',
-      dishId: 'DISH-004',
-      dishName: 'Margherita Pizza',
-      status: 'pending',
-      rating: 3,
-      feedback: 'Average taste, could be better. Cheese was not melted properly. The pizza was okay but not exceptional. The cheese seemed to be added after baking which made it not melt properly. The tomato sauce was good but could use more herbs for better flavor.',
-      createdAt: '2024-01-09 16:20:00',
-      orderNumber: 'ORD-2024-004',
-      orderTotal: 'PKR 950'
-    },
-    {
-      id: 5,
-      customerName: 'Zara Sheikh',
-      customerPhone: '+92 304 5678901',
-      customerId: 'CUST-005',
-      kitchenId: 'KITCHEN-004',
-      kitchenName: 'Desi Delights',
-      dishId: 'DISH-005',
-      dishName: 'Chicken Biryani',
-      status: 'approved',
-      rating: 5,
-      feedback: 'Amazing biryani! Perfect spices and tender chicken. Will order again. This was one of the best biryanis I have ever had. The rice was perfectly cooked, chicken was tender and juicy, and the spices were balanced perfectly. The portion size was also generous.',
-      createdAt: '2024-01-08 19:30:00',
-      orderNumber: 'ORD-2024-005',
-      orderTotal: 'PKR 1,200'
-    }
-  ];
-
+  // Fetch feedback detail from API
+  const { data: detailResp, isLoading, isError, refetch } = useGetFeedbackByIdQuery(id);
+  const [updateFeedbackDetails, { isLoading: isUpdating }] = useUpdateFeedbackDetailsMutation();
+  const [sendFeedbackToKitchen, { isLoading: isSending }] = useSendFeedbackToKitchenMutation();
+  const [rejectFeedback, { isLoading: isRejecting }] = useRejectFeedbackMutation();
+  const [deleteFeedbackMedia, { isLoading: isDeletingMedia }] = useDeleteFeedbackMediaMutation();
+  const [deletingMediaId, setDeletingMediaId] = useState(null);
   useEffect(() => {
-    // Simulate API call
-    const foundFeedback = mockFeedbacks.find(f => f.id === parseInt(id));
-    setFeedback(foundFeedback);
-    setLoading(false);
-  }, [id]);
+    if (detailResp && detailResp.data) {
+      setFeedback(detailResp.data);
+      setLoading(false);
+    }
+  }, [detailResp]);
 
   const handleReject = () => {
     setShowRejectConfirmModal(true);
   };
 
-  const confirmReject = () => {
-    // In a real app, this would call an API to reject the feedback
-    console.log('Rejecting feedback with reason:', rejectReason, 'and comment:', rejectComment);
-    setFeedback({ ...feedback, status: 'rejected' });
-    setShowRejectConfirmModal(false);
-    setRejectReason('');
-    setRejectComment('');
-    alert('Feedback has been rejected successfully!');
+  const confirmReject = async () => {
+    try {
+      await rejectFeedback({ id, rejectedReason: rejectReason, adminComments: rejectComment }).unwrap();
+      setFeedback({ ...feedback, status: 'REJECTED', rejectedReason: rejectReason, adminComments: rejectComment });
+      setShowRejectConfirmModal(false);
+      setRejectReason('');
+      setRejectComment('');
+      showDialogue('success', 'Feedback Rejected', 'The feedback has been rejected successfully.');
+    } catch (e) {
+      const msg = e?.data?.message || 'Failed to reject feedback. Please try again.';
+      showDialogue('error', 'Reject Failed', msg);
+    }
   };
 
   const handleCancelReject = () => {
@@ -193,13 +96,18 @@ const FeedbackDetail = () => {
     setShowSendToKitchenModal(true);
   };
 
-  const confirmSendToKitchen = () => {
-    // In a real app, this would call an API to send feedback to kitchen
-    console.log('Sending feedback to kitchen with comment:', sendToKitchenComment);
-    setFeedback({ ...feedback, status: 'approved' });
-    setShowSendToKitchenModal(false);
-    setSendToKitchenComment('');
-    alert('Feedback has been sent to kitchen successfully!');
+  const confirmSendToKitchen = async () => {
+    try {
+      await sendFeedbackToKitchen({ id, adminComments: sendToKitchenComment }).unwrap();
+      // Optimistically update status to PENDING_AT_KITCHEN
+      setFeedback({ ...feedback, status: 'PENDING_AT_KITCHEN', adminComments: sendToKitchenComment });
+      setShowSendToKitchenModal(false);
+      setSendToKitchenComment('');
+      showDialogue('success', 'Sent to Kitchen', 'Feedback has been sent to the kitchen successfully.');
+    } catch (e) {
+      const msg = e?.data?.message || 'Failed to send to kitchen. Please try again.';
+      showDialogue('error', 'Send Failed', msg);
+    }
   };
 
   const handleCancelSendToKitchen = () => {
@@ -219,45 +127,70 @@ const FeedbackDetail = () => {
     navigate('/feedback');
   };
 
-  const handleEdit = () => {
-    setEditComment(feedback.feedback);
-    setEditMediaFiles(feedback.mediaFiles ? [...feedback.mediaFiles] : []);
+  const handleEdit = async () => {
+    // Refetch latest detail before opening edit
+    try {
+      await refetch();
+    } catch (e) {}
+    const latest = detailResp?.data || feedback;
+    setEditComment(latest?.customerFinalComments || '');
+    setEditMediaFiles(Array.isArray(latest?.media) ? [...latest.media] : []);
     setShowEditModal(true);
   };
 
   const handleDeleteMedia = (mediaId) => {
+    // Deprecated local only delete; handled by API below
     setEditMediaFiles(editMediaFiles.filter(media => media.id !== mediaId));
+  };
+
+  const handleDeleteMediaApi = async (mediaId) => {
+    try {
+      setDeletingMediaId(mediaId);
+      await deleteFeedbackMedia({ id, mediaId }).unwrap();
+      // Remove from local edit state and main feedback media
+      setEditMediaFiles((prev) => prev.filter((m) => m.id !== mediaId));
+      setFeedback((prev) => ({ ...prev, media: Array.isArray(prev?.media) ? prev.media.filter((m) => m.id !== mediaId) : prev?.media }));
+      showDialogue('success', 'Media Deleted', 'The media item has been deleted successfully.');
+    } catch (e) {
+      const msg = e?.data?.message || 'Failed to delete media. Please try again.';
+      showDialogue('error', 'Delete Failed', msg);
+    } finally {
+      setDeletingMediaId(null);
+    }
   };
 
   const handleSaveEdit = () => {
     setShowUpdateConfirmModal(true);
   };
 
-  const confirmUpdate = () => {
-    setFeedback({ ...feedback, feedback: editComment, mediaFiles: editMediaFiles });
-    setShowEditModal(false);
-    setShowUpdateConfirmModal(false);
-    setEditComment('');
-    setUpdateComment('');
-    setEditMediaFiles([]);
-    // TODO: API call to update feedback with update comment and media files
-    alert('Feedback updated successfully');
-  };
-
-  const getStatusBadge = (status) => {
-    switch (status) {
-      case 'pending':
-        return <span className="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-yellow-100 text-yellow-800">Pending</span>;
-      case 'approved':
-        return <span className="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-green-100 text-green-800">Approved</span>;
-      case 'rejected':
-        return <span className="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-red-100 text-red-800">Rejected</span>;
-      default:
-        return <span className="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-gray-100 text-gray-800">Unknown</span>;
+  const confirmUpdate = async () => {
+    try {
+      await updateFeedbackDetails({ id, customerFinalComments: editComment, adminComments: updateComment }).unwrap();
+      // Optimistically update local state
+      setFeedback({ ...feedback, customerFinalComments: editComment, adminComments: updateComment });
+      setShowEditModal(false);
+      setShowUpdateConfirmModal(false);
+      setEditComment('');
+      setUpdateComment('');
+      setEditMediaFiles([]);
+      showDialogue('success', 'Feedback Updated', 'Customer comments have been updated successfully.');
+    } catch (e) {
+      const msg = e?.data?.message || 'Failed to update feedback. Please try again.';
+      showDialogue('error', 'Update Failed', msg);
     }
   };
 
-  if (loading) {
+  const getStatusBadge = (statusRaw) => {
+    const s = String(statusRaw || '').toLowerCase();
+    if (s === 'pending_at_kitchen') return <span className="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-blue-100 text-blue-800">PENDING_AT_KITCHEN</span>;
+    if (['pending','initiated'].includes(s)) return <span className="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-yellow-100 text-yellow-800">Pending</span>;
+    if (['approved','resolved','completed','done'].includes(s)) return <span className="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-green-100 text-green-800">Resolved</span>;
+    if (['rejected','closed'].includes(s)) return <span className="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-red-100 text-red-800">Rejected</span>;
+    if (['in_progress','in progress','processing'].includes(s)) return <span className="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-blue-100 text-blue-800">In Progress</span>;
+    return <span className="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-gray-100 text-gray-800">{statusRaw || 'Unknown'}</span>;
+  };
+
+  if (isLoading || loading) {
     return (
       <div className="flex justify-center items-center h-64">
         <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary-600"></div>
@@ -265,11 +198,11 @@ const FeedbackDetail = () => {
     );
   }
 
-  if (!feedback) {
+  if (isError || !feedback) {
     return (
       <div className="text-center py-12">
         <h3 className="mt-2 text-sm font-medium text-gray-900">Feedback not found</h3>
-        <p className="mt-1 text-sm text-gray-500">The feedback you're looking for doesn't exist.</p>
+        <p className="mt-1 text-sm text-gray-500">Failed to load feedback or it doesn't exist.</p>
         <div className="mt-6">
           <Link
             to="/feedback"
@@ -334,17 +267,20 @@ const FeedbackDetail = () => {
                 })}
               </p>
             </div>
-            <div>
-              <button
-                onClick={handleEdit}
-                className="inline-flex items-center px-4 py-2 border border-gray-300 shadow-sm text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500"
-              >
-                <PencilIcon className="h-4 w-4 mr-2" />
-                Edit
-              </button>
-            </div>
+            {canEditFeedback && (
+              <div>
+                <button
+                  onClick={handleEdit}
+                  className="inline-flex items-center px-4 py-2 border border-gray-300 shadow-sm text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500"
+                >
+                  <PencilIcon className="h-4 w-4 mr-2" />
+                  Edit
+                </button>
+              </div>
+            )}
           </div>
         </div>
+
 
         {/* Customer Information */}
         <div className="px-4 py-5 sm:p-6">
@@ -453,44 +389,33 @@ const FeedbackDetail = () => {
         <div className="px-4 py-5 sm:p-6 border-t border-gray-200">
           <h3 className="text-lg font-medium text-gray-900 mb-4">Customer Feedback</h3>
           <div className="bg-gray-50 rounded-lg p-4 mb-4">
-            <p className="text-gray-700 leading-relaxed">{feedback.feedback}</p>
+            <p className="text-gray-700 leading-relaxed whitespace-pre-wrap">{feedback.customerFinalComments || '—'}</p>
           </div>
           
         </div>
 
-        {/* Media Files */}
-        {feedback.mediaFiles && feedback.mediaFiles.length > 0 && (
+        {/* Media (at the end) */}
+        {Array.isArray(feedback.media) && feedback.media.length > 0 && (
           <div className="px-4 py-5 sm:p-6 border-t border-gray-200">
             <h3 className="text-lg font-medium text-gray-900 mb-4 flex items-center">
               <PhotoIcon className="h-5 w-5 mr-2" />
-              Media Files
+              Media
             </h3>
             <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
-              {feedback.mediaFiles.map((media) => (
-                <div key={media.id} className="relative group">
+              {feedback.media.map((m) => (
+                <div key={m.id} className="relative group">
                   <div className="aspect-square bg-gray-200 rounded-lg overflow-hidden">
                     <img
-                      src={media.thumbnail}
-                      alt={media.name}
+                      src={m.processedUrl}
+                      alt={m.caption || 'media'}
                       className="w-full h-full object-cover group-hover:opacity-75 transition-opacity"
                     />
-                    {media.type === 'video' && (
-                      <div className="absolute inset-0 flex items-center justify-center">
-                        <div className="bg-black bg-opacity-50 rounded-full p-2">
-                          <PlayIcon className="h-8 w-8 text-white" />
-                        </div>
-                      </div>
-                    )}
                   </div>
-                  <div className="mt-2">
-                    <p className="text-sm font-medium text-gray-900 truncate">{media.name}</p>
-                    <p className="text-xs text-gray-500 capitalize">{media.type}</p>
-                  </div>
-                  <button
-                    onClick={() => window.open(media.url, '_blank')}
-                    className="absolute inset-0 w-full h-full bg-transparent hover:bg-black hover:bg-opacity-10 transition-colors rounded-lg"
-                    title={`View ${media.name}`}
-                  />
+                  {m.caption && (
+                    <div className="mt-2">
+                      <p className="text-xs text-gray-600">{m.caption}</p>
+                    </div>
+                  )}
                 </div>
               ))}
             </div>
@@ -506,18 +431,24 @@ const FeedbackDetail = () => {
             >
               Cancel
             </button>
-            <button
-              onClick={handleReject}
-              className="inline-flex items-center px-4 py-2 border border-transparent shadow-sm text-sm font-medium rounded-md text-white bg-red-600 hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500"
-            >
-              Reject
-            </button>
-            <button
-              onClick={handleSendToKitchen}
-              className="inline-flex items-center px-4 py-2 border border-transparent shadow-sm text-sm font-medium rounded-md text-white bg-primary-600 hover:bg-primary-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500"
-            >
-              Send to Kitchen
-            </button>
+            {canRejectFeedback && (
+              <button
+                onClick={handleReject}
+                className="inline-flex items-center px-4 py-2 border border-transparent shadow-sm text-sm font-medium rounded-md text-white bg-red-600 hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500"
+              >
+                {isRejecting ? 'Rejecting...' : 'Reject'}
+              </button>
+            )}
+            {canSendToKitchen && (
+              <button
+                onClick={handleSendToKitchen}
+                disabled={String(feedback.status || '').toUpperCase() === 'PENDING_AT_KITCHEN'}
+                aria-disabled={String(feedback.status || '').toUpperCase() === 'PENDING_AT_KITCHEN'}
+                className={`inline-flex items-center px-4 py-2 border border-transparent shadow-sm text-sm font-medium rounded-md text-white ${String(feedback.status || '').toUpperCase() === 'PENDING_AT_KITCHEN' ? 'bg-gray-300 cursor-not-allowed' : 'bg-primary-600 hover:bg-primary-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500'}`}
+              >
+                {isSending ? 'Sending...' : 'Send to Kitchen'}
+              </button>
+            )}
           </div>
         </div>
       </div>
@@ -611,42 +542,34 @@ const FeedbackDetail = () => {
                   </label>
                   {editMediaFiles && editMediaFiles.length > 0 ? (
                     <div className="grid grid-cols-2 gap-4">
-                      {editMediaFiles.map((media) => (
-                        <div key={media.id} className="relative group">
+                      {editMediaFiles.map((m) => (
+                        <div key={m.id} className="relative group">
                           <div className="aspect-square bg-gray-200 rounded-lg overflow-hidden">
                             <img
-                              src={media.thumbnail}
-                              alt={media.name}
-                              className="w-full h-full object-cover"
+                              src={m.processedUrl}
+                              alt={m.caption || 'media'}
+                              className="w-full h-full object-cover group-hover:opacity-75 transition-opacity"
                             />
-                            {media.type === 'video' && (
-                              <div className="absolute inset-0 flex items-center justify-center">
-                                <div className="bg-black bg-opacity-50 rounded-full p-2">
-                                  <PlayIcon className="h-6 w-6 text-white" />
-                                </div>
-                              </div>
+                          </div>
+                          <div className="mt-2 flex items-center justify-between">
+                            <p className="text-xs text-gray-600 truncate">{m.caption || '—'}</p>
+                            {canDeleteMedia && (
+                              <button
+                                type="button"
+                                onClick={() => handleDeleteMediaApi(m.id)}
+                                className="text-red-600 hover:text-red-700"
+                                title="Delete media"
+                                disabled={deletingMediaId === m.id}
+                              >
+                                <TrashIcon className="h-4 w-4" />
+                              </button>
                             )}
                           </div>
-                          <div className="mt-2">
-                            <p className="text-sm font-medium text-gray-900 truncate">{media.name}</p>
-                            <p className="text-xs text-gray-500 capitalize">{media.type}</p>
-                          </div>
-                          {/* Delete Button */}
-                          <button
-                            onClick={() => handleDeleteMedia(media.id)}
-                            className="absolute top-2 right-2 bg-red-600 hover:bg-red-700 text-white rounded-full p-1 opacity-0 group-hover:opacity-100 transition-opacity"
-                            title="Delete media file"
-                          >
-                            <TrashIcon className="h-4 w-4" />
-                          </button>
                         </div>
                       ))}
                     </div>
                   ) : (
-                    <div className="text-center py-8 border-2 border-dashed border-gray-300 rounded-lg">
-                      <PhotoIcon className="mx-auto h-12 w-12 text-gray-400" />
-                      <p className="mt-2 text-sm text-gray-500">No media files</p>
-                    </div>
+                    <p className="text-sm text-gray-500">No media uploaded.</p>
                   )}
                 </div>
               </div>
@@ -862,6 +785,15 @@ const FeedbackDetail = () => {
           </div>
         </div>
       )}
+
+      {/* DialogueBox for API feedback */}
+      <DialogueBox
+        isOpen={dialogueBox.isOpen}
+        onClose={closeDialogue}
+        type={dialogueBox.type}
+        title={dialogueBox.title}
+        message={dialogueBox.message}
+      />
     </div>
   );
 };

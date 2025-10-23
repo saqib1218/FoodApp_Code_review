@@ -10,7 +10,7 @@ export const feedbackApi = apiSlice.injectEndpoints({
     // Feedback Management
     getFeedback: builder.query({
       query: (params = {}) => ({
-        url: '/admin/feedback',
+        url: '/admin/feedbacks',
         params: {
           page: params.page || 1,
           limit: params.limit || 10,
@@ -27,7 +27,7 @@ export const feedbackApi = apiSlice.injectEndpoints({
     }),
     
     getFeedbackById: builder.query({
-      query: (feedbackId) => `/admin/feedback/${feedbackId}`,
+      query: (feedbackId) => `/admin/feedbacks/${feedbackId}`,
       providesTags: (result, error, arg) => [{ type: 'Feedback', id: arg }],
     }),
     
@@ -88,6 +88,57 @@ export const feedbackApi = apiSlice.injectEndpoints({
         'Feedback'
       ],
     }),
+
+    // Update feedback details (customerFinalComments, adminComments)
+    updateFeedbackDetails: builder.mutation({
+      query: ({ id, customerFinalComments, adminComments }) => ({
+        url: `/admin/feedbacks/${id}`,
+        method: 'PATCH',
+        body: { customerFinalComments, adminComments },
+      }),
+      invalidatesTags: (result, error, arg) => [
+        { type: 'Feedback', id: arg.id },
+        'Feedback',
+      ],
+    }),
+
+    // Send feedback to kitchen
+    sendFeedbackToKitchen: builder.mutation({
+      query: ({ id, adminComments }) => ({
+        url: `/admin/feedbacks/${id}/send`,
+        method: 'PATCH',
+        body: { adminComments },
+      }),
+      invalidatesTags: (result, error, arg) => [
+        { type: 'Feedback', id: arg.id },
+        'Feedback',
+      ],
+    }),
+
+    // Reject feedback
+    rejectFeedback: builder.mutation({
+      query: ({ id, rejectedReason, adminComments }) => ({
+        url: `/admin/feedbacks/${id}/reject`,
+        method: 'PATCH',
+        body: { rejectedReason, adminComments },
+      }),
+      invalidatesTags: (result, error, arg) => [
+        { type: 'Feedback', id: arg.id },
+        'Feedback',
+      ],
+    }),
+
+    // Delete a media item from feedback
+    deleteFeedbackMedia: builder.mutation({
+      query: ({ id, mediaId }) => ({
+        url: `/admin/feedbacks/${id}/media/${mediaId}`,
+        method: 'DELETE',
+      }),
+      invalidatesTags: (result, error, arg) => [
+        { type: 'Feedback', id: arg.id },
+        'Feedback',
+      ],
+    }),
   }),
 });
 
@@ -95,6 +146,11 @@ export const feedbackApi = apiSlice.injectEndpoints({
 export const {
   useGetFeedbackQuery,
   useGetFeedbackByIdQuery,
+  useLazyGetFeedbackByIdQuery,
+  useUpdateFeedbackDetailsMutation,
+  useSendFeedbackToKitchenMutation,
+  useRejectFeedbackMutation,
+  useDeleteFeedbackMediaMutation,
   useUpdateFeedbackStatusMutation,
   useRespondToFeedbackMutation,
   useDeleteFeedbackMutation,

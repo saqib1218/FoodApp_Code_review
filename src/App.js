@@ -33,6 +33,8 @@ import Discounts from './pages/discounts/Discounts';
 import DiscountDetail from './pages/discounts/DiscountDetail';
 import Feedback from './pages/feedbacks/Feedback';
 import FeedbackDetail from './pages/feedbacks/FeedbackDetail';
+import RequestList from './pages/requests/RequestList';
+import RequestDetail from './pages/requests/requestDetail/RequestDetail';
 // Dish Management
 import DishesList from './pages/dishes/DishesList';
 import DishDetail from './pages/dishes/DishDetail';
@@ -40,10 +42,10 @@ import DishDetail from './pages/dishes/DishDetail';
 import MyCasesList from './pages/cases/MyCasesList';
 import AllCasesList from './pages/cases/AllCasesList';
 import CaseDetailPage from './pages/cases/CaseDetail/CaseDetailPage';
+
 // Protected Route Components
 import ProtectedRoute from './components/ProtectedRoute';
 import KitchenDishDetailPage from './pages/kitchens/KitchenDishDetailPage';
-import KitchenRequestDetail from './pages/kitchens/KitchenRequestDetail';
 
 // Basic Authentication Route Component
 const AuthRoute = ({ children }) => {
@@ -102,11 +104,6 @@ function App() {
             <Route path="/kitchens/:kitchenId/dishes/:dishId" element={
               <ProtectedRoute routeName="kitchens">
                 <KitchenDishDetailPage />
-              </ProtectedRoute>
-            } />
-            <Route path="/kitchens/requests/:requestId" element={
-              <ProtectedRoute routeName="kitchens">
-                <KitchenRequestDetail />
               </ProtectedRoute>
             } />
             
@@ -208,6 +205,22 @@ function App() {
             <Route path="/cases/:id" element={
               <ProtectedRoute routeName="cases">
                 <CaseDetailPage />
+              </ProtectedRoute>
+            } />
+            <Route path="/feedback/:id" element={
+              <ProtectedRoute routeName="feedback">
+                <FeedbackDetail />
+              </ProtectedRoute>
+            } />
+
+            <Route path="/requests" element={
+              <ProtectedRoute routeName="requests">
+                <RequestList />
+              </ProtectedRoute>
+            } />
+            <Route path="/requests/:id" element={
+              <ProtectedRoute routeName="requests">
+                <RequestDetail />
               </ProtectedRoute>
             } />
             

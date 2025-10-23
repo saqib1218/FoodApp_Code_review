@@ -1,9 +1,9 @@
 import React, { useState } from 'react';
-import { Link } from 'react-router-dom';
+import { useGetFeedbackQuery, useLazyGetFeedbackByIdQuery } from '../../store/api/modules/feedback/feedbackApi';
+import { usePermissions } from '../../hooks/usePermissions';
+import { Link, useNavigate } from 'react-router-dom';
 import { 
   EyeIcon, 
-  PencilIcon, 
-  TrashIcon,
   MagnifyingGlassIcon,
   FunnelIcon,
   ChevronUpIcon,
@@ -13,8 +13,7 @@ import {
 const Feedback = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
-  const [showDeleteConfirmModal, setShowDeleteConfirmModal] = useState(false);
-  const [selectedFeedback, setSelectedFeedback] = useState(null);
+  // removed delete flow
   const [showAdvancedFilters, setShowAdvancedFilters] = useState(false);
   const [mobileFilter, setMobileFilter] = useState('');
   const [kitchenFilter, setKitchenFilter] = useState('');
@@ -22,87 +21,39 @@ const Feedback = () => {
   const [sortField, setSortField] = useState('');
   const [sortDirection, setSortDirection] = useState('asc');
 
-  // Mock feedback data
-  const [feedbacks, setFeedbacks] = useState([
-    {
-      id: 1,
-      customerName: 'Ahmed Hassan',
-      customerPhone: '+92 300 1234567',
-      customerId: 'CUST-001',
-      kitchenId: 'KITCHEN-001',
-      kitchenName: 'Pizza Palace',
-      orderId: 'ORD-001',
-      dishName: 'Chicken Tikka Pizza',
-      status: 'pending',
-      rating: 4,
-      feedback: 'Great taste but delivery was a bit late. Overall satisfied with the quality.',
-      createdAt: '2024-01-12 14:30:00'
-    },
-    {
-      id: 2,
-      customerName: 'Fatima Khan',
-      customerPhone: '+92 301 2345678',
-      customerId: 'CUST-002',
-      kitchenId: 'KITCHEN-002',
-      kitchenName: 'Burger House',
-      dishId: 'DISH-002',
-      dishName: 'Beef Burger Deluxe',
-      status: 'approved',
-      rating: 5,
-      feedback: 'Excellent burger! Perfect taste and very fresh ingredients. Highly recommended.',
-      createdAt: '2024-01-11 18:45:00'
-    },
-    {
-      id: 3,
-      customerName: 'Sarah Ahmed',
-      customerPhone: '+92 302 3456789',
-      customerId: 'CUST-003',
-      kitchenId: 'KITCHEN-003',
-      kitchenName: 'Sushi Master',
-      dishId: 'DISH-003',
-      dishName: 'California Roll',
-      status: 'rejected',
-      rating: 2,
-      feedback: 'Not fresh, rice was hard and fish didn\'t taste good. Very disappointed.',
-      createdAt: '2024-01-10 20:15:00'
-    },
-    {
-      id: 4,
-      customerName: 'Ali Raza',
-      customerPhone: '+92 303 4567890',
-      customerId: 'CUST-004',
-      kitchenId: 'KITCHEN-001',
-      kitchenName: 'Pizza Palace',
-      dishId: 'DISH-004',
-      dishName: 'Margherita Pizza',
-      status: 'pending',
-      rating: 3,
-      feedback: 'Average taste, could be better. Cheese was not melted properly.',
-      createdAt: '2024-01-09 16:20:00'
-    },
-    {
-      id: 5,
-      customerName: 'Zara Sheikh',
-      customerPhone: '+92 304 5678901',
-      customerId: 'CUST-005',
-      kitchenId: 'KITCHEN-004',
-      kitchenName: 'Desi Delights',
-      dishId: 'DISH-005',
-      dishName: 'Chicken Biryani',
-      status: 'approved',
-      rating: 5,
-      feedback: 'Amazing biryani! Perfect spices and tender chicken. Will order again.',
-      createdAt: '2024-01-08 19:30:00'
-    }
-  ]);
+  const { hasPermission } = usePermissions();
+  const canViewFeedbackList = hasPermission('admin.feedback.list.view');
+  const canViewFeedbackDetail = hasPermission('admin.feedback.detail.view');
+  const navigate = useNavigate();
+  const [triggerGetDetail] = useLazyGetFeedbackByIdQuery();
+
+  const { data: feedbackResp, isLoading, isError, refetch } = useGetFeedbackQuery({ page: 1, limit: 20 }, { skip: !canViewFeedbackList });
+  // API returns { data: { feedbacks: [...] } }
+  const apiFeedbacksRaw = feedbackResp?.data?.feedbacks || [];
+  const apiFeedbacks = apiFeedbacksRaw.map(f => ({
+    id: f.id,
+    customerName: f.customerName || '-',
+    customerPhone: f.customerPhone || '',
+    customerId: f.customerId || '',
+    kitchenId: f.kitchenId || '',
+    kitchenName: f.kitchenName || '-',
+    orderId: f.orderId || f.orderName || null,
+    dishName: f.orderName || null,
+    status: (f.status || '').toLowerCase(),
+    rating: Number(f.feedbackRating) || 0,
+    createdAt: f.createdAt || ''
+  }));
+
+  // Use API data exclusively
+  const sourceList = apiFeedbacks;
 
   // Filter feedbacks based on search and status
-  const filteredFeedbacks = feedbacks.filter(feedback => {
-    const matchesSearch = feedback.customerName.toLowerCase().includes(searchTerm.toLowerCase());
-    const matchesMobile = feedback.customerPhone.includes(mobileFilter);
-    const matchesKitchen = feedback.kitchenName.toLowerCase().includes(kitchenFilter.toLowerCase());
-    const matchesOrderId = feedback.orderId ? feedback.orderId.toLowerCase().includes(orderIdFilter.toLowerCase()) : true;
-    const matchesStatus = statusFilter === 'all' || feedback.status === statusFilter;
+  const filteredFeedbacks = sourceList.filter(feedback => {
+    const matchesSearch = (feedback.customerName || '').toLowerCase().includes(searchTerm.toLowerCase());
+    const matchesMobile = (feedback.customerPhone || '').includes(mobileFilter);
+    const matchesKitchen = (feedback.kitchenName || '').toLowerCase().includes(kitchenFilter.toLowerCase());
+    const matchesOrderId = feedback.orderId ? String(feedback.orderId).toLowerCase().includes(orderIdFilter.toLowerCase()) : true;
+    const matchesStatus = statusFilter === 'all' || (feedback.status || '').toLowerCase() === statusFilter.toLowerCase();
     
     return matchesSearch && matchesMobile && matchesKitchen && matchesOrderId && matchesStatus;
   }).sort((a, b) => {
@@ -124,29 +75,24 @@ const Feedback = () => {
     return 0;
   });
 
-  const getStatusBadge = (status) => {
-    switch (status) {
-      case 'pending':
-        return <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-yellow-100 text-yellow-800">Pending</span>;
-      case 'approved':
-        return <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">Approved</span>;
-      case 'rejected':
-        return <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-800">Rejected</span>;
-      default:
-        return <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-800">Unknown</span>;
+  const getStatusBadge = (statusRaw) => {
+    const status = String(statusRaw || '').toLowerCase();
+    if (['pending','initiated'].includes(status)) {
+      return <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-yellow-100 text-yellow-800">{status === 'initiated' ? 'Initiated' : 'Pending'}</span>;
     }
+    if (['approved','resolved','completed','done'].includes(status)) {
+      return <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">{status === 'approved' ? 'Approved' : 'Resolved'}</span>;
+    }
+    if (['rejected','closed'].includes(status)) {
+      return <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-800">Rejected</span>;
+    }
+    if (['in_progress','in progress','processing'].includes(status)) {
+      return <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">In Progress</span>;
+    }
+    return <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-800">{status || 'Unknown'}</span>;
   };
 
-  const handleDelete = (feedback) => {
-    setSelectedFeedback(feedback);
-    setShowDeleteConfirmModal(true);
-  };
-
-  const confirmDelete = () => {
-    setFeedbacks(feedbacks.filter(f => f.id !== selectedFeedback.id));
-    setShowDeleteConfirmModal(false);
-    setSelectedFeedback(null);
-  };
+  // delete handlers removed
 
   const handleSort = (field) => {
     if (sortField === field) {
@@ -163,6 +109,45 @@ const Feedback = () => {
       <ChevronUpIcon className="h-4 w-4 inline ml-1" /> : 
       <ChevronDownIcon className="h-4 w-4 inline ml-1" />;
   };
+
+  if (!canViewFeedbackList) {
+    return (
+      <div className="flex items-center justify-center min-h-96">
+        <div className="text-center">
+          <h3 className="text-lg font-medium text-neutral-900 mb-2">Access Denied</h3>
+          <p className="text-neutral-500">You don't have permission to view the feedback list.</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center min-h-96">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary-500 mx-auto"></div>
+          <p className="mt-2 text-sm text-neutral-500">Loading feedbacks...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (isError) {
+    return (
+      <div className="flex items-center justify-center min-h-96">
+        <div className="text-center">
+          <h3 className="text-lg font-medium text-neutral-900 mb-2">Error Loading Feedbacks</h3>
+          <p className="text-neutral-500 mb-4">Failed to load feedback data. Please try again.</p>
+          <button
+            onClick={() => refetch()}
+            className="px-4 py-2 bg-primary-600 text-white rounded-md hover:bg-primary-700 transition-colors"
+          >
+            Retry
+          </button>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="">
@@ -292,9 +277,11 @@ const Feedback = () => {
                     >
                       Rating {getSortIcon('rating')}
                     </th>
-                    <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Actions
-                    </th>
+                    {canViewFeedbackDetail && (
+                      <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        Actions
+                      </th>
+                    )}
                   </tr>
                 </thead>
                 <tbody className="bg-white divide-y divide-gray-200">
@@ -302,20 +289,19 @@ const Feedback = () => {
                     <tr key={feedback.id}>
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
                         <div>
-                          <div className="font-medium">{feedback.customerName}</div>
-                          <div className="text-xs text-gray-500">{feedback.customerPhone}</div>
+                          <div className="font-medium">{feedback.customerName || '-'}</div>
+                          <div className="text-xs text-gray-500">{feedback.customerPhone || ''}</div>
                         </div>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                         <div>
-                          <div className="font-medium">{feedback.kitchenName}</div>
-                          <div className="text-xs text-gray-400">ID: {feedback.kitchenId}</div>
+                          <div className="font-medium">{feedback.kitchenName || '-'}</div>
                         </div>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                         <div>
-                          <div className="font-medium">{feedback.orderId}</div>
-                          <div className="text-xs text-gray-400">{feedback.dishName}</div>
+                          <div className="font-medium">{feedback.orderId || '-'}</div>
+                          <div className="text-xs text-gray-400">{feedback.dishName || ''}</div>
                         </div>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
@@ -326,34 +312,36 @@ const Feedback = () => {
                           {[...Array(5)].map((_, i) => (
                             <svg
                               key={i}
-                              className={`h-4 w-4 ${
-                                i < feedback.rating ? 'text-yellow-400' : 'text-gray-300'
-                              }`}
+                              className={`h-4 w-4 ${i < (Number(feedback.rating) || 0) ? 'text-yellow-400' : 'text-gray-300'}`}
                               fill="currentColor"
                               viewBox="0 0 20 20"
                             >
                               <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
                             </svg>
                           ))}
-                          <span className="ml-1 text-xs text-gray-600">({feedback.rating})</span>
+                          <span className="ml-1 text-xs text-gray-600">({Number(feedback.rating) || 0})</span>
                         </div>
                       </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                        <div className="flex items-center space-x-2">
-                          <Link
-                            to={`/feedback/${feedback.id}`}
-                            className="text-primary-600 hover:text-primary-900"
-                          >
-                            <EyeIcon className="h-4 w-4" />
-                          </Link>
-                          <button
-                            onClick={() => handleDelete(feedback)}
-                            className="text-red-600 hover:text-red-900"
-                          >
-                            <TrashIcon className="h-4 w-4" />
-                          </button>
-                        </div>
-                      </td>
+                      {canViewFeedbackDetail && (
+                        <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                          <div className="flex items-center justify-end">
+                            <button
+                              className="text-primary-600 hover:text-primary-900"
+                              title="View Feedback"
+                              onClick={async () => {
+                                try {
+                                  await triggerGetDetail(feedback.id).unwrap();
+                                } catch (e) {
+                                  // ignore error here; detail page will handle error state
+                                }
+                                navigate(`/feedback/${feedback.id}`);
+                              }}
+                            >
+                              <EyeIcon className="h-4 w-4" />
+                            </button>
+                          </div>
+                        </td>
+                      )}
                     </tr>
                   ))}
                 </tbody>
@@ -373,38 +361,7 @@ const Feedback = () => {
         </div>
       )}
 
-      {/* Delete Confirmation Modal */}
-      {showDeleteConfirmModal && (
-        <div className="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50">
-          <div className="relative top-20 mx-auto p-5 border w-96 shadow-lg rounded-md bg-white">
-            <div className="mt-3 text-center">
-              <div className="mx-auto flex items-center justify-center h-12 w-12 rounded-full bg-red-100">
-                <TrashIcon className="h-6 w-6 text-red-600" />
-              </div>
-              <h3 className="text-lg font-medium text-gray-900 mt-2">Delete Feedback</h3>
-              <div className="mt-2 px-7 py-3">
-                <p className="text-sm text-gray-500">
-                  Are you sure you want to delete this feedback from {selectedFeedback?.customerName}? This action cannot be undone.
-                </p>
-              </div>
-              <div className="flex justify-center space-x-4 mt-4">
-                <button
-                  onClick={() => setShowDeleteConfirmModal(false)}
-                  className="px-4 py-2 bg-gray-300 text-gray-700 rounded-md hover:bg-gray-400"
-                >
-                  Cancel
-                </button>
-                <button
-                  onClick={confirmDelete}
-                  className="px-4 py-2 bg-red-600 text-white rounded-md hover:bg-red-700"
-                >
-                  Delete
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
+      {/* Detail shown on dedicated page; inline preview removed */}
     </div>
   );
 };

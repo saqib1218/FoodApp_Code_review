@@ -59,12 +59,24 @@ export const PERMISSIONS = {
 
   // Feedback Management
   FEEDBACK_VIEW: 'admin.feedback.view',
+  FEEDBACK_LIST_VIEW: 'admin.feedback.list.view',
+  FEEDBACK_DETAIL_VIEW: 'admin.feedback.detail.view',
+  FEEDBACK_EDIT: 'admin.feedback.edit',
+  FEEDBACK_SEND_TO_KITCHEN: 'admin.feedback.send.to.kitchen',
+  FEEDBACK_REJECT: 'admin.feedback.reject',
+  FEEDBACK_MEDIA_DELETE: 'admin.feedback.media.delete',
 
   // Discount Management
   DISCOUNT_VIEW: 'admin.discount.view',
 
   // Reports
   REPORTS_VIEW: 'admin.reports.view',
+
+  // Requests
+  REQUEST_VIEW: 'admin.request.view',
+  REQUEST_LIST_VIEW: 'admin.request.list.view',
+  REQUEST_DETAIL_VIEW: 'admin.request.detail.view',
+  REQUEST_APPROVE: 'admin.request.approve',
 
   // Settings
   SETTINGS_VIEW: 'admin.setting.view',

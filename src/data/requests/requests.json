@@ -1,0 +1,36 @@
+{
+  "requests": [
+    {
+      "id": "REQ-1001",
+      "customerName": "Ahmed Hassan",
+      "type": "KitchenUpdate",
+      "status": "pending",
+      "orderId": "ORD-2001",
+      "createdAt": "2025-10-21T10:15:00.000Z"
+    },
+    {
+      "id": "REQ-1002",
+      "customerName": "Sara Malik",
+      "type": "MediaRemoval",
+      "status": "in_progress",
+      "orderId": null,
+      "createdAt": "2025-10-22T08:42:00.000Z"
+    },
+    {
+      "id": "REQ-1003",
+      "customerName": "Ali Raza",
+      "type": "Refund",
+      "status": "approved",
+      "orderId": "ORD-2010",
+      "createdAt": "2025-10-20T14:20:00.000Z"
+    },
+    {
+      "id": "REQ-1004",
+      "customerName": "Fatima Khan",
+      "type": "AccountReview",
+      "status": "rejected",
+      "orderId": "ORD-2011",
+      "createdAt": "2025-10-19T09:00:00.000Z"
+    }
+  ]
+}

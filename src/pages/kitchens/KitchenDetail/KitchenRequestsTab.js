@@ -88,7 +88,7 @@ const KitchenRequestsTab = () => {
                     <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
                       {hasPermission(EXTRA_PERMISSIONS.REQUEST_DETAIL_VIEW) && (
                         <button
-                          onClick={() => navigate(`/kitchens/requests/${req.id}`)}
+                          onClick={() => navigate(`/requests/${req.id}`)}
                           className="text-green-600 hover:text-green-900"
                           title="View"
                         >
