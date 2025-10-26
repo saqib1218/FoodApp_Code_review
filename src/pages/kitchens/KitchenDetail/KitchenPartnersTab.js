@@ -5,7 +5,7 @@ import { useAuth } from '../../../hooks/useAuth';
 import { PermissionButton } from '../../../components/PermissionGate';
 import { KitchenContext } from './index';
 import { PERMISSIONS } from '../../../contexts/PermissionRegistry';
-import { XMarkIcon, UserPlusIcon, ClipboardDocumentIcon, PencilIcon, TrashIcon, EyeIcon, ChatBubbleLeftRightIcon } from '@heroicons/react/24/outline';
+import { XMarkIcon, UserPlusIcon, ClipboardDocumentIcon, PencilIcon, TrashIcon, EyeIcon, ChatBubbleLeftRightIcon, EllipsisVerticalIcon } from '@heroicons/react/24/outline';
 import ConfirmationModal from '../../../components/ConfirmationModal';
 
 const KitchenPartnersTab = () => {
@@ -51,6 +51,19 @@ const KitchenPartnersTab = () => {
   const [showViewUserModal, setShowViewUserModal] = useState(false);
   const [deleteComment, setDeleteComment] = useState('');
   const [updateComment, setUpdateComment] = useState('');
+  // Row actions menu state (3-dots)
+  const [openMenuFor, setOpenMenuFor] = useState(null); // user id/index
+  const [openMenuPos, setOpenMenuPos] = useState({ top: 0, left: 0 });
+  const handleOpenMenu = (e, rowKey) => {
+    const rect = e.currentTarget.getBoundingClientRect();
+    const menuWidth = 176; // 44 * 4
+    const menuHeight = 144; // approx
+    const gap = 8;
+    const top = rect.top + window.scrollY - menuHeight - gap; // open upward
+    const left = rect.right + window.scrollX - menuWidth; // right align
+    setOpenMenuPos({ top, left });
+    setOpenMenuFor(openMenuFor === rowKey ? null : rowKey);
+  };
   const [editUserForm, setEditUserForm] = useState({
     name: '',
     email: '',
@@ -417,27 +430,15 @@ const KitchenPartnersTab = () => {
                     </span>
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                    <div className="flex justify-end space-x-2">
+                    <div className="relative inline-block text-left">
                       <button
-                        onClick={() => handleChatWithUser(user)}
-                        className="text-purple-600 hover:text-purple-900 transition-colors"
-                        title="Chat with user"
+                        type="button"
+                        className="inline-flex items-center justify-center p-2 rounded-full hover:bg-neutral-100 text-neutral-700"
+                        onClick={(e) => handleOpenMenu(e, `user-${index}`)}
+                        aria-haspopup="menu"
+                        aria-expanded={openMenuFor === `user-${index}`}
                       >
-                        <ChatBubbleLeftRightIcon className="h-4 w-4" />
-                      </button>
-                      <button
-                        onClick={() => handleEditUser(user)}
-                        className="text-blue-600 hover:text-blue-900 transition-colors"
-                        title="Edit user"
-                      >
-                        <PencilIcon className="h-4 w-4" />
-                      </button>
-                      <button
-                        onClick={() => handleViewUser(user)}
-                        className="text-green-600 hover:text-green-900 transition-colors"
-                        title="View user"
-                      >
-                        <EyeIcon className="h-4 w-4" />
+                        <EllipsisVerticalIcon className="h-5 w-5" />
                       </button>
                     </div>
                   </td>
@@ -445,6 +446,47 @@ const KitchenPartnersTab = () => {
               ))}
             </tbody>
           </table>
+        </div>
+      )}
+
+      {/* Floating row actions menu */}
+      {openMenuFor && (
+        <div className="fixed inset-0 z-[70]" onClick={() => setOpenMenuFor(null)}>
+          <div
+            className="absolute w-44 rounded-md shadow-lg bg-white ring-1 ring-black ring-opacity-5"
+            style={{ top: openMenuPos.top, left: openMenuPos.left }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="py-1">
+              {(() => {
+                const idx = Number(String(openMenuFor).replace('user-',''));
+                const row = kitchenUsers[idx];
+                if (!row) return null;
+                return (
+                  <>
+                    <button
+                      className="w-full text-left px-4 py-2 text-sm text-neutral-700 hover:bg-neutral-50"
+                      onClick={() => { handleChatWithUser(row); setOpenMenuFor(null); }}
+                    >
+                      Chat
+                    </button>
+                    <button
+                      className="w-full text-left px-4 py-2 text-sm text-neutral-700 hover:bg-neutral-50"
+                      onClick={() => { handleEditUser(row); setOpenMenuFor(null); }}
+                    >
+                      Edit Partner
+                    </button>
+                    <button
+                      className="w-full text-left px-4 py-2 text-sm text-neutral-700 hover:bg-neutral-50"
+                      onClick={() => { handleViewUser(row); setOpenMenuFor(null); }}
+                    >
+                      View Partner
+                    </button>
+                  </>
+                );
+              })()}
+            </div>
+          </div>
         </div>
       )}
 

@@ -1,6 +1,6 @@
 import React, { useState, useContext } from 'react';
 import { useParams } from 'react-router-dom';
-import { PencilIcon, XMarkIcon, PlusIcon, EyeIcon, TrashIcon } from '@heroicons/react/24/outline';
+import { PencilIcon,PlusIcon, EyeIcon, TrashIcon, XMarkIcon, EllipsisVerticalIcon } from '@heroicons/react/24/outline';
 import { useGetKitchenAddressesQuery, useAddKitchenAddressMutation, useUpdateKitchenAddressMutation } from '../../../store/api/modules/kitchens/kitchensApi';
 import { useAuth } from '../../../hooks/useAuth';
 import { PERMISSIONS } from '../../../contexts/PermissionRegistry';
@@ -50,6 +50,19 @@ const KitchenAddressesTab = () => {
   // Activate Address modal state
   const [showActivateConfirmModal, setShowActivateConfirmModal] = useState(false);
   const [activateComment, setActivateComment] = useState('');
+  // Row actions menu state (3-dots)
+  const [openMenuFor, setOpenMenuFor] = useState(null); // address.id
+  const [openMenuPos, setOpenMenuPos] = useState({ top: 0, left: 0 });
+  const handleOpenMenu = (e, row) => {
+    const rect = e.currentTarget.getBoundingClientRect();
+    const menuWidth = 176; // 44 * 4
+    const menuHeight = 144; // approx height for 3-4 items
+    const gap = 8;
+    const top = rect.top + window.scrollY - menuHeight - gap; // open upward
+    const left = rect.right + window.scrollX - menuWidth; // right align
+    setOpenMenuPos({ top, left });
+    setOpenMenuFor(openMenuFor === row.id ? null : row.id);
+  };
   
   // Dialogue box state for API feedback
   const [dialogueBox, setDialogueBox] = useState({
@@ -455,42 +468,15 @@ const KitchenAddressesTab = () => {
                     {getStatusBadge(address.status || 'active')}
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                    <div className="flex justify-end space-x-2">
-                      {(() => {
-                        const statusUpper = String(address.status || '').toUpperCase();
-                        if (statusUpper === 'INACTIVE') {
-                          return (
-                            <button
-                              onClick={() => { setSelectedAddress(address); setActivateComment(''); setShowActivateConfirmModal(true); }}
-                              className="px-3 py-1 rounded-full bg-primary-600 text-white hover:bg-primary-700 text-xs font-medium"
-                              title="Activate Address"
-                            >
-                              Activate Address
-                            </button>
-                          );
-                        }
-                        return null;
-                      })()}
-                      {(() => {
-                        const statusUpper = String(address.status || '').toUpperCase();
-                        const canEdit = ['ACTIVE','INACTIVE','DRAFT'].includes(statusUpper);
-                        return (
-                          <button
-                            onClick={() => { if (canEdit) handleEditAddress(address); }}
-                            disabled={!canEdit}
-                            className={`transition-colors ${canEdit ? 'text-blue-600 hover:text-blue-900' : 'text-neutral-400 cursor-not-allowed'}`}
-                            title={canEdit ? 'Edit address' : 'Editing disabled for this status'}
-                          >
-                            <PencilIcon className="h-4 w-4" />
-                          </button>
-                        );
-                      })()}
+                    <div className="relative inline-block text-left">
                       <button
-                        onClick={() => handleViewAddress(address)}
-                        className="text-green-600 hover:text-green-900 transition-colors"
-                        title="View address"
+                        type="button"
+                        className="inline-flex items-center justify-center p-2 rounded-full hover:bg-neutral-100 text-neutral-700"
+                        onClick={(e) => handleOpenMenu(e, address)}
+                        aria-haspopup="menu"
+                        aria-expanded={openMenuFor === address.id}
                       >
-                        <EyeIcon className="h-4 w-4" />
+                        <EllipsisVerticalIcon className="h-5 w-5" />
                       </button>
                     </div>
                   </td>
@@ -498,6 +484,51 @@ const KitchenAddressesTab = () => {
               ))}
             </tbody>
           </table>
+        </div>
+      )}
+
+      {/* Floating row actions menu */}
+      {openMenuFor && (
+        <div className="fixed inset-0 z-[70]" onClick={() => setOpenMenuFor(null)}>
+          <div
+            className="absolute w-44 rounded-md shadow-lg bg-white ring-1 ring-black ring-opacity-5"
+            style={{ top: openMenuPos.top, left: openMenuPos.left }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="py-1">
+              {(() => {
+                const row = addresses.find(a => a.id === openMenuFor);
+                if (!row) return null;
+                const statusUpper = String(row.status || '').toUpperCase();
+                const canEdit = ['ACTIVE','INACTIVE','DRAFT'].includes(statusUpper);
+                return (
+                  <>
+                    {statusUpper === 'INACTIVE' && (
+                      <button
+                        className="w-full text-left px-4 py-2 text-sm text-neutral-700 hover:bg-neutral-50"
+                        onClick={() => { setSelectedAddress(row); setActivateComment(''); setShowActivateConfirmModal(true); setOpenMenuFor(null); }}
+                      >
+                        Activate Address
+                      </button>
+                    )}
+                    <button
+                      className={`w-full text-left px-4 py-2 text-sm hover:bg-neutral-50 ${canEdit ? 'text-neutral-700' : 'text-neutral-400 cursor-not-allowed'}`}
+                      onClick={() => { if (canEdit) { handleEditAddress(row); setOpenMenuFor(null); } }}
+                      disabled={!canEdit}
+                    >
+                      Edit Address
+                    </button>
+                    <button
+                      className="w-full text-left px-4 py-2 text-sm text-neutral-700 hover:bg-neutral-50"
+                      onClick={() => { handleViewAddress(row); setOpenMenuFor(null); }}
+                    >
+                      View Address
+                    </button>
+                  </>
+                );
+              })()}
+            </div>
+          </div>
         </div>
       )}
 

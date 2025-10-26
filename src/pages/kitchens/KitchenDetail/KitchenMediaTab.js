@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useContext } from 'react';
-import { XMarkIcon, PlusIcon, PencilIcon, EyeIcon, TrashIcon, CloudArrowUpIcon } from '@heroicons/react/24/outline';
+import { XMarkIcon, PlusIcon, PencilIcon, EyeIcon, TrashIcon, CloudArrowUpIcon, EllipsisVerticalIcon } from '@heroicons/react/24/outline';
 import { useAuth } from '../../../hooks/useAuth';
 import { 
   useGetKitchenMediaQuery,
@@ -43,11 +43,25 @@ const KitchenMediaTab = () => {
   const [newMediaType, setNewMediaType] = useState('image');
   const [newMediaUsedAs, setNewMediaUsedAs] = useState('banner');
   const [newMediaCaption, setNewMediaCaption] = useState('');
+  const [newMediaName, setNewMediaName] = useState('');
   const [newMediaPreview, setNewMediaPreview] = useState('');
   const [newMediaStatus, setNewMediaStatus] = useState('active');
   const [confirmComment, setConfirmComment] = useState('');
   const [deleteComment, setDeleteComment] = useState('');
   const [updateComment, setUpdateComment] = useState('');
+  // Row actions menu state (3-dots)
+  const [openMenuFor, setOpenMenuFor] = useState(null); // media.id
+  const [openMenuPos, setOpenMenuPos] = useState({ top: 0, left: 0 });
+  const handleOpenMenu = (e, row) => {
+    const rect = e.currentTarget.getBoundingClientRect();
+    const menuWidth = 176; // 44 * 4
+    const menuHeight = 144; // approx height
+    const gap = 8;
+    const top = rect.top + window.scrollY - menuHeight - gap; // open upward
+    const left = rect.right + window.scrollX - menuWidth; // right align
+    setOpenMenuPos({ top, left });
+    setOpenMenuFor(openMenuFor === row.id ? null : row.id);
+  };
   
   // Dialogue box state for API feedback
   const [dialogueBox, setDialogueBox] = useState({
@@ -56,6 +70,20 @@ const KitchenMediaTab = () => {
     title: '',
     message: ''
   });
+
+  // Helper: sort media by createdAt DESC (latest first)
+  const sortMediaByCreatedAtDesc = (list = []) => {
+    try {
+      const toTime = (item) => {
+        const v = item?.createdAt || item?.created_at || item?.createdOn || item?.created_on || item?.uploadDate || item?.uploadedAt || item?.created || item?.date;
+        const t = v ? new Date(v).getTime() : 0;
+        return Number.isFinite(t) ? t : 0;
+      };
+      return [...list].sort((a, b) => toTime(b) - toTime(a));
+    } catch {
+      return Array.isArray(list) ? [...list] : [];
+    }
+  };
 
   // Dialogue box helper functions
   const showDialogue = (type, title, message) => {
@@ -79,7 +107,7 @@ const KitchenMediaTab = () => {
   // Update local state when RTK Query data changes
   useEffect(() => {
     if (kitchenMediaData?.data) {
-      setKitchenMedia(kitchenMediaData.data);
+      setKitchenMedia(sortMediaByCreatedAtDesc(kitchenMediaData.data));
     }
   }, [kitchenMediaData]);
 
@@ -110,6 +138,7 @@ const KitchenMediaTab = () => {
     setNewMediaType('image');
     setNewMediaUsedAs('banner');
     setNewMediaCaption('');
+    setNewMediaName('');
     setNewMediaStatus('active');
     setShowAddMediaModal(true);
   };
@@ -206,6 +235,7 @@ const KitchenMediaTab = () => {
     setNewMediaType('image');
     setNewMediaUsedAs('banner');
     setNewMediaCaption('');
+    setNewMediaName('');
     setConfirmComment('');
     setSelectedMedia(null);
   };
@@ -216,6 +246,7 @@ const KitchenMediaTab = () => {
     setSelectedMedia(media);
     setNewMediaType(media.mediaType || 'image');
     setNewMediaUsedAs(media.categoryType || 'banner');
+    setNewMediaName(media.mediaName || media.name || '');
     setNewMediaCaption(media.caption || '');
     setNewMediaStatus((media.status || 'active').toLowerCase() === 'inactive' ? 'inactive' : 'active');
     setNewMediaPreview('');
@@ -256,9 +287,9 @@ const KitchenMediaTab = () => {
       // For now, perform a local optimistic update for caption and status only
       if (!selectedMedia) return;
       const updatedList = kitchenMedia.map(m =>
-        m.id === selectedMedia.id ? { ...m, caption: newMediaCaption, status: newMediaStatus } : m
+        m.id === selectedMedia.id ? { ...m, caption: newMediaCaption, status: newMediaStatus, mediaName: newMediaName } : m
       );
-      setKitchenMedia(updatedList);
+      setKitchenMedia(sortMediaByCreatedAtDesc(updatedList));
       showDialogue('success', 'Media Updated', 'Caption and status have been updated.');
     } catch (error) {
       console.error('Failed to update media:', error);
@@ -426,7 +457,10 @@ const KitchenMediaTab = () => {
                 <thead className="bg-neutral-50">
                   <tr>
                     <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-neutral-500 uppercase tracking-wider">
-                      Preview
+                      Media Preview
+                    </th>
+                    <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-neutral-500 uppercase tracking-wider">
+                      Media Name
                     </th>
                     <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-neutral-500 uppercase tracking-wider">
                       Status
@@ -465,6 +499,9 @@ const KitchenMediaTab = () => {
                         </div>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
+                        <div className="text-sm text-neutral-900 max-w-xs truncate">{media.mediaName || media.name || '-'}</div>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap">
                         {getMediaStatusBadge(media.status || 'active')}
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
@@ -483,27 +520,15 @@ const KitchenMediaTab = () => {
                         </div>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                        <div className="flex justify-end space-x-2">
+                        <div className="relative inline-block text-left">
                           <button
-                            onClick={() => handleEditMedia(media)}
-                            className="text-blue-600 hover:text-blue-900 transition-colors"
-                            title="Edit media"
+                            type="button"
+                            className="inline-flex items-center justify-center p-2 rounded-full hover:bg-neutral-100 text-neutral-700"
+                            onClick={(e) => handleOpenMenu(e, media)}
+                            aria-haspopup="menu"
+                            aria-expanded={openMenuFor === media.id}
                           >
-                            <PencilIcon className="h-4 w-4" />
-                          </button>
-                          <button
-                            onClick={() => openMediaInNewTab(media)}
-                            className="text-green-600 hover:text-green-900 transition-colors"
-                            title="View media"
-                          >
-                            <EyeIcon className="h-4 w-4" />
-                          </button>
-                          <button
-                            onClick={() => handleDeleteMedia(media)}
-                            className="text-red-600 hover:text-red-900 transition-colors"
-                            title="Delete media"
-                          >
-                            <TrashIcon className="h-4 w-4" />
+                            <EllipsisVerticalIcon className="h-5 w-5" />
                           </button>
                         </div>
                       </td>
@@ -512,6 +537,52 @@ const KitchenMediaTab = () => {
                 </tbody>
               </table>
             )}
+          </div>
+        </div>
+      )}
+
+      {/* Floating row actions menu */}
+      {openMenuFor && (
+        <div className="fixed inset-0 z-[70]" onClick={() => setOpenMenuFor(null)}>
+          <div
+            className="absolute w-44 rounded-md shadow-lg bg-white ring-1 ring-black ring-opacity-5"
+            style={{ top: openMenuPos.top, left: openMenuPos.left }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="py-1">
+              {(() => {
+                const row = kitchenMedia.find(m => m.id === openMenuFor);
+                if (!row) return null;
+                return (
+                  <>
+                    <button
+                      className="w-full text-left px-4 py-2 text-sm text-neutral-700 hover:bg-neutral-50"
+                      onClick={() => { setSelectedMedia(row); setNewMediaStatus((row.status || 'active').toLowerCase() === 'active' ? 'inactive' : 'active'); setNewMediaName(row.mediaName || row.name || ''); setNewMediaCaption(row.caption || ''); setShowUpdateConfirmModal(true); setOpenMenuFor(null); }}
+                    >
+                      {(row.status || 'active').toLowerCase() === 'active' ? 'Mark Inactive' : 'Mark Active'}
+                    </button>
+                    <button
+                      className="w-full text-left px-4 py-2 text-sm text-neutral-700 hover:bg-neutral-50"
+                      onClick={() => { handleEditMedia(row); setOpenMenuFor(null); }}
+                    >
+                      Edit Media
+                    </button>
+                    <button
+                      className="w-full text-left px-4 py-2 text-sm text-neutral-700 hover:bg-neutral-50"
+                      onClick={() => { openMediaInNewTab(row); setOpenMenuFor(null); }}
+                    >
+                      View Media
+                    </button>
+                    <button
+                      className="w-full text-left px-4 py-2 text-sm text-red-600 hover:bg-red-50"
+                      onClick={() => { handleDeleteMedia(row); setOpenMenuFor(null); }}
+                    >
+                      Delete
+                    </button>
+                  </>
+                );
+              })()}
+            </div>
           </div>
         </div>
       )}
@@ -536,6 +607,16 @@ const KitchenMediaTab = () => {
                 {selectedMedia ? (
                   <>
                     <div>
+                      <label className="block text-sm font-medium text-neutral-700 mb-1">Media Name</label>
+                      <input
+                        type="text"
+                        value={newMediaName}
+                        onChange={(e) => setNewMediaName(e.target.value)}
+                        className="w-full p-2 border border-neutral-300 rounded-lg"
+                        placeholder="Enter a media name"
+                      />
+                    </div>
+                    <div>
                       <label className="block text-sm font-medium text-neutral-700 mb-1">Caption</label>
                       <input
                         type="text"
@@ -559,6 +640,16 @@ const KitchenMediaTab = () => {
                   </>
                 ) : (
                   <>
+                    <div>
+                      <label className="block text-sm font-medium text-neutral-700 mb-1">Media Name</label>
+                      <input
+                        type="text"
+                        value={newMediaName}
+                        onChange={(e) => setNewMediaName(e.target.value)}
+                        className="w-full p-2 border border-neutral-300 rounded-lg"
+                        placeholder="Enter a media name"
+                      />
+                    </div>
                     <div>
                       <label className="block text-sm font-medium text-neutral-700 mb-1">Media Type</label>
                       <select
