@@ -1,6 +1,7 @@
 import React, { useState, useEffect, createContext } from 'react';
+import ReactDOM from 'react-dom';
 import { useParams, Link, useNavigate } from 'react-router-dom';
-import { ArrowLeftIcon, PencilIcon, XMarkIcon } from '@heroicons/react/24/outline';
+import { ArrowLeftIcon, PencilIcon, XMarkIcon, PlusIcon } from '@heroicons/react/24/outline';
 import { CheckCircleIcon, ClockIcon, XCircleIcon } from '@heroicons/react/24/outline';
 import { useGetKitchenByIdQuery, useUpdateKitchenMutation, useSubmitKitchenMutation } from '../../../store/api/modules/kitchens/kitchensApi';
 import { useAuth } from '../../../hooks/useAuth';
@@ -37,9 +38,24 @@ const KitchenDetail = () => {
   // RTK Query to fetch kitchen data - only if user has permission
   const { data: kitchenResponse, isLoading, error, refetch } = useGetKitchenByIdQuery(id, {
     skip: !canViewKitchenDetails,
-    refetchOnMountOrArgChange: true,
-    refetchOnFocus: true,
+    // Only fetch once on initial mount; avoid refetching on tab changes
+    refetchOnMountOrArgChange: false,
+    refetchOnFocus: false,
   });
+
+  // Create Case modal state (replicated from AllCasesList)
+  const [showCreateCaseModal, setShowCreateCaseModal] = useState(false);
+  const [createCaseForm, setCreateCaseForm] = useState({
+    title: '',
+    type: '',
+    priority: '',
+    initiatorType: '',
+    description: '',
+  });
+  const [showCreateCaseConfirm, setShowCreateCaseConfirm] = useState(false);
+  const [createCaseConfirmComment, setCreateCaseConfirmComment] = useState('');
+
+  // (debug logging removed)
   
   // RTK Query mutation for updating kitchen
   const [updateKitchen, { isLoading: isUpdatingKitchen }] = useUpdateKitchenMutation();
@@ -137,9 +153,9 @@ const KitchenDetail = () => {
 
   // Tab navigation handler
   const handleTabChange = (tab) => {
+    // Switch tabs without refetching the base kitchen detail
+    // Each tab is responsible for its own API calls (media, addresses, dishes, etc.)
     setActiveTab(tab);
-    // Always refetch when switching tabs to avoid showing stale status/info
-    refetch();
   };
 
   // Status update handlers
@@ -280,9 +296,21 @@ const KitchenDetail = () => {
               <ArrowLeftIcon className="h-5 w-5" />
             </Link>
             <h2 className="text-xl font-medium text-neutral-900">{kitchen.name}</h2>
-            <div className="ml-4">{getStatusBadge(kitchen.status)}</div>
+            <div className="ml-4">
+              <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
+                {kitchen.status || 'N/A'}
+              </span>
+            </div>
           </div>
           <div className="flex space-x-3">
+            {/* Create Case Button (before Edit Kitchen) */}
+            <button
+              onClick={() => { setShowCreateCaseModal(true); }}
+              className="px-4 py-2 border border-transparent rounded-full shadow-sm text-sm font-medium text-white bg-primary-600 hover:bg-primary-700 flex items-center"
+            >
+              <PlusIcon className="h-4 w-4 mr-2" />
+              Create Case
+            </button>
             {/* Edit Kitchen Button */}
             <PermissionGate permission={PERMISSIONS.KITCHEN_EDIT}>
               <button
@@ -332,11 +360,7 @@ const KitchenDetail = () => {
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <div>
               <div className="mb-4">
-                <h3 className="text-sm font-medium text-neutral-500">Kitchen Name</h3>
-                <p className="mt-1 text-neutral-900">{kitchen.name || 'N/A'}</p>
-              </div>
-              <div className="mb-4">
-                <h3 className="text-sm font-medium text-neutral-500">Registration Date</h3>
+                <h3 className="text-sm font-medium text-neutral-500">Onboarding Date</h3>
                 <p className="mt-1 text-neutral-900">
                   {kitchen.createdAt ? new Date(kitchen.createdAt).toLocaleDateString() : 'N/A'}
                 </p>
@@ -354,8 +378,10 @@ const KitchenDetail = () => {
             </div>
             <div>
               <div className="mb-4">
-                <h3 className="text-sm font-medium text-neutral-500">Status</h3>
-                <p className="mt-1">{getStatusBadge(kitchen.status)}</p>
+                <h3 className="text-sm font-medium text-neutral-500">First Activation Date</h3>
+                <p className="mt-1 text-neutral-900">
+                  {kitchen.firstActivationDate ? new Date(kitchen.firstActivationDate).toLocaleDateString() : 'N/A'}
+                </p>
               </div>
               <div>
                 <h3 className="text-sm font-medium text-neutral-500">Logo Available</h3>
@@ -519,17 +545,12 @@ const KitchenDetail = () => {
 
       {/* Edit Kitchen Modal */}
       {showEditModal && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-xl shadow-lg max-w-md w-full p-6">
-            <div className="flex justify-between items-center mb-4">
-              <h3 className="text-lg font-medium text-neutral-900">
-                Edit Kitchen Information
-              </h3>
-              <button
-                onClick={() => setShowEditModal(false)}
-                className="text-neutral-500 hover:text-neutral-700"
-              >
-                <XMarkIcon className="h-5 w-5" />
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-[9999] p-4" role="dialog" aria-modal="true">
+          <div className="bg-white rounded-xl shadow-lg max-w-md w-full p-6 max-h-[90vh] overflow-y-auto">
+            <div className="flex justify-between items-center mb-6">
+              <h3 className="text-lg font-medium text-neutral-900">Edit Kitchen Information</h3>
+              <button onClick={() => setShowEditModal(false)} className="text-gray-400 hover:text-gray-600">
+                <XMarkIcon className="h-6 w-6" />
               </button>
             </div>
             
@@ -596,6 +617,99 @@ const KitchenDetail = () => {
           </div>
         </div>
       )}
+
+      {/* Create Case Modal */}
+      {showCreateCaseModal && ReactDOM.createPortal(
+        (
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-[9999] p-4" role="dialog" aria-modal="true">
+            <div className="bg-white rounded-xl shadow-lg max-w-md w-full p-6 max-h-[90vh] overflow-y-auto">
+              <div className="flex justify-between items-center mb-6">
+                <h3 className="text-lg font-medium text-neutral-900">Create Case</h3>
+                <button onClick={() => setShowCreateCaseModal(false)} className="text-gray-400 hover:text-gray-600">
+                  <XMarkIcon className="h-6 w-6" />
+                </button>
+              </div>
+              <div className="space-y-4">
+                <div>
+                  <label className="block text-sm font-medium text-neutral-700 mb-1">Case Title *</label>
+                  <input
+                    type="text"
+                    value={createCaseForm.title}
+                    onChange={(e) => setCreateCaseForm({ ...createCaseForm, title: e.target.value })}
+                    className="w-full p-2 border border-neutral-300 rounded-lg"
+                    placeholder="Enter case title"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-neutral-700 mb-1">Case Type *</label>
+                  <select
+                    value={createCaseForm.type}
+                    onChange={(e) => setCreateCaseForm({ ...createCaseForm, type: e.target.value })}
+                    className="w-full p-2 border border-neutral-300 rounded-lg"
+                  >
+                    <option value="">Select type</option>
+                    <option value="kitchen complaint">kitchen complaint</option>
+                    <option value="customer complaint">customer complaint</option>
+                    <option value="system issue">system issue</option>
+                    <option value="feedback">feedback</option>
+                    <option value="inquiry">inquiry</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-neutral-700 mb-1">Priority *</label>
+                  <select
+                    value={createCaseForm.priority}
+                    onChange={(e) => setCreateCaseForm({ ...createCaseForm, priority: e.target.value })}
+                    className="w-full p-2 border border-neutral-300 rounded-lg"
+                  >
+                    <option value="">Select priority</option>
+                    <option value="low">low</option>
+                    <option value="medium">medium</option>
+                    <option value="high">high</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-neutral-700 mb-1">Initiator Type *</label>
+                  <select
+                    value={createCaseForm.initiatorType}
+                    onChange={(e) => setCreateCaseForm({ ...createCaseForm, initiatorType: e.target.value })}
+                    className="w-full p-2 border border-neutral-300 rounded-lg"
+                  >
+                    <option value="">Select initiator</option>
+                    <option value="customer">customer</option>
+                    <option value="kitchen">kitchen</option>
+                    <option value="admin">admin</option>
+                    <option value="system">system</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-neutral-700 mb-1">Description</label>
+                  <textarea
+                    rows={4}
+                    value={createCaseForm.description}
+                    onChange={(e) => setCreateCaseForm({ ...createCaseForm, description: e.target.value })}
+                    className="w-full p-2 border border-neutral-300 rounded-lg"
+                    placeholder="Add details for this case"
+                  />
+                </div>
+                <div className="flex justify-end space-x-3 mt-6">
+                  <button
+                    onClick={() => { setShowCreateCaseModal(false); setCreateCaseForm({ title: '', type: '', priority: '', initiatorType: '', description: '' }); }}
+                    className="px-4 py-2 bg-white border border-neutral-300 text-neutral-700 rounded-full hover:bg-neutral-50 text-sm font-medium"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    onClick={() => { setShowCreateCaseConfirm(true); }}
+                    className="px-4 py-2 bg-primary-600 text-white rounded-full hover:bg-primary-700 text-sm font-medium"
+                  >
+                    Save
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        ), document.body)}
 
       {/* Dialogue Box for API feedback */}
       <DialogueBox

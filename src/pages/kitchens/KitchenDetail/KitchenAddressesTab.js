@@ -46,6 +46,10 @@ const KitchenAddressesTab = () => {
   const [showUpdateConfirmModal, setShowUpdateConfirmModal] = useState(false);
   const [deleteComment, setDeleteComment] = useState('');
   const [updateComment, setUpdateComment] = useState('');
+  const isEditMode = Boolean(selectedAddress);
+  // Activate Address modal state
+  const [showActivateConfirmModal, setShowActivateConfirmModal] = useState(false);
+  const [activateComment, setActivateComment] = useState('');
   
   // Dialogue box state for API feedback
   const [dialogueBox, setDialogueBox] = useState({
@@ -56,12 +60,17 @@ const KitchenAddressesTab = () => {
   });
   
   const [addressForm, setAddressForm] = useState({
-    street: '',
+    addressName: '',
+    fullAddress: '',
+    addressLine2: '',
     city: '',
-    state: '',
-    zipCode: '',
+    cityZone: '',
+    nearestLocation: '',
+    locationLink: '',
+    longitude: '',
+    latitude: '',
     country: '',
-    type: 'primary'
+    deliveryInstructions: ''
   });
 
   // Dialogue box helper functions
@@ -72,6 +81,27 @@ const KitchenAddressesTab = () => {
       title,
       message
     });
+  };
+
+  // Confirm activate address (set status to active)
+  const handleConfirmActivateAddress = async () => {
+    if (!selectedAddress) return;
+    try {
+      const result = await updateKitchenAddress({
+        kitchenId,
+        addressId: selectedAddress.kitchenAddressId || selectedAddress.id,
+        addressData: { status: 'active' }
+      }).unwrap();
+      console.log('Address activated successfully:', result);
+      showDialogue('success', 'Address Activated', 'The address has been activated successfully.');
+      setShowActivateConfirmModal(false);
+      setActivateComment('');
+      setSelectedAddress(null);
+    } catch (err) {
+      console.error('Failed to activate address:', err);
+      const errorMessage = err?.data?.message || 'Failed to activate address. Please try again.';
+      showDialogue('error', 'Error', errorMessage);
+    }
   };
 
   // Open the entered location link in a new tab for verification
@@ -95,7 +125,9 @@ const KitchenAddressesTab = () => {
     setSelectedAddress(null);
     setShowModal(true);
     setAddressForm({
+      addressName: '',
       fullAddress: '',
+      addressLine2: '',
       city: 'Karachi',
       cityZone: '',
       nearestLocation: '',
@@ -103,7 +135,7 @@ const KitchenAddressesTab = () => {
       longitude: '',
       latitude: '',
       country: 'Pakistan',
-      status: 'active'
+      deliveryInstructions: ''
     });
     setShowAddressModal(true);
   };
@@ -112,7 +144,9 @@ const KitchenAddressesTab = () => {
   const handleEditAddress = (address) => {
     setSelectedAddress(address);
     setAddressForm({
+      addressName: address.addressName || '',
       fullAddress: address.addressLine1 || '',
+      addressLine2: address.addressLine2 || '',
       city: address.city || 'Karachi',
       cityZone: address.zone || '',
       nearestLocation: address.nearestLocation || '',
@@ -120,7 +154,7 @@ const KitchenAddressesTab = () => {
       longitude: address.longitude || '',
       latitude: address.latitude || '',
       country: address.country || 'Pakistan',
-      status: address.status || 'active'
+      deliveryInstructions: address.deliveryInstructions || address.instructions || ''
     });
     setShowAddressModal(true);
   };
@@ -228,6 +262,10 @@ const KitchenAddressesTab = () => {
   // Handle submit (add or edit)
   const handleSubmit = (e) => {
     e.preventDefault();
+    if (!addressForm.addressName || !addressForm.addressName.trim()) {
+      alert('Address Name is required');
+      return;
+    }
     if (selectedAddress) {
       // For edit, show update confirmation modal
       setUpdateComment('');
@@ -247,14 +285,17 @@ const KitchenAddressesTab = () => {
       if (modalAction === 'add') {
         // Prepare API payload with only required fields
         const apiPayload = {
+          addressName: addressForm.addressName,
           addressLine1: addressForm.fullAddress,
+          addressLine2: addressForm.addressLine2 || null,
           city: addressForm.city,
           country: addressForm.country,
           zone: addressForm.cityZone || '',
           mapLink: addressForm.locationLink || '',
           nearestLocation: addressForm.nearestLocation || '',
           latitude: addressForm.latitude || '',
-          longitude: addressForm.longitude || ''
+          longitude: addressForm.longitude || '',
+          deliveryInstructions: addressForm.deliveryInstructions || ''
         };
         
         // Call API to add address
@@ -270,7 +311,9 @@ const KitchenAddressesTab = () => {
         
         // Reset form after successful addition
         setAddressForm({
+          addressName: '',
           fullAddress: '',
+          addressLine2: '',
           city: '',
           cityZone: '',
           nearestLocation: '',
@@ -278,14 +321,22 @@ const KitchenAddressesTab = () => {
           longitude: '',
           latitude: '',
           country: '',
-          status: 'active'
+          deliveryInstructions: ''
         });
       } else {
         // Prepare API payload with only required fields for update
         const apiPayload = {
+          addressName: addressForm.addressName,
           addressLine1: addressForm.fullAddress,
+          addressLine2: addressForm.addressLine2 || null,
           city: addressForm.city,
-          country: addressForm.country
+          country: addressForm.country,
+          zone: addressForm.cityZone || '',
+          mapLink: addressForm.locationLink || '',
+          nearestLocation: addressForm.nearestLocation || '',
+          latitude: addressForm.latitude || '',
+          longitude: addressForm.longitude || '',
+          deliveryInstructions: addressForm.deliveryInstructions || ''
         };
         
         // Call API to update address
@@ -325,26 +376,12 @@ const KitchenAddressesTab = () => {
 
   // Get status badge
   const getStatusBadge = (status) => {
-    switch (status) {
-      case 'active':
-        return (
-          <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
-            Active
-          </span>
-        );
-      case 'inactive':
-        return (
-          <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-800">
-            Inactive
-          </span>
-        );
-      default:
-        return (
-          <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-neutral-100 text-neutral-800">
-            {status}
-          </span>
-        );
-    }
+    const label = String(status || 'N/A');
+    return (
+      <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
+        {label}
+      </span>
+    );
   };
 
   if (isLoadingAddresses) {
@@ -392,7 +429,7 @@ const KitchenAddressesTab = () => {
             <thead className="bg-neutral-50">
               <tr>
                 <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-neutral-500 uppercase tracking-wider">
-                  Address Line 1
+                  Address Name
                 </th>
                 <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-neutral-500 uppercase tracking-wider">
                   Country
@@ -409,7 +446,7 @@ const KitchenAddressesTab = () => {
               {addresses.map((address) => (
                 <tr key={address.id}>
                   <td className="px-6 py-4 whitespace-normal">
-                    <div className="text-sm text-neutral-900">{address.addressLine1 || 'N/A'}</div>
+                    <div className="text-sm text-neutral-900">{address.addressName || 'N/A'}</div>
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap">
                     <div className="text-sm text-neutral-900">{address.country || 'N/A'}</div>
@@ -419,26 +456,41 @@ const KitchenAddressesTab = () => {
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
                     <div className="flex justify-end space-x-2">
-                      <button
-                        onClick={() => handleEditAddress(address)}
-                        className="text-blue-600 hover:text-blue-900 transition-colors"
-                        title="Edit address"
-                      >
-                        <PencilIcon className="h-4 w-4" />
-                      </button>
+                      {(() => {
+                        const statusUpper = String(address.status || '').toUpperCase();
+                        if (statusUpper === 'INACTIVE') {
+                          return (
+                            <button
+                              onClick={() => { setSelectedAddress(address); setActivateComment(''); setShowActivateConfirmModal(true); }}
+                              className="px-3 py-1 rounded-full bg-primary-600 text-white hover:bg-primary-700 text-xs font-medium"
+                              title="Activate Address"
+                            >
+                              Activate Address
+                            </button>
+                          );
+                        }
+                        return null;
+                      })()}
+                      {(() => {
+                        const statusUpper = String(address.status || '').toUpperCase();
+                        const canEdit = ['ACTIVE','INACTIVE','DRAFT'].includes(statusUpper);
+                        return (
+                          <button
+                            onClick={() => { if (canEdit) handleEditAddress(address); }}
+                            disabled={!canEdit}
+                            className={`transition-colors ${canEdit ? 'text-blue-600 hover:text-blue-900' : 'text-neutral-400 cursor-not-allowed'}`}
+                            title={canEdit ? 'Edit address' : 'Editing disabled for this status'}
+                          >
+                            <PencilIcon className="h-4 w-4" />
+                          </button>
+                        );
+                      })()}
                       <button
                         onClick={() => handleViewAddress(address)}
                         className="text-green-600 hover:text-green-900 transition-colors"
                         title="View address"
                       >
                         <EyeIcon className="h-4 w-4" />
-                      </button>
-                      <button
-                        onClick={() => handleDeleteAddress(address)}
-                        className="text-red-600 hover:text-red-900 transition-colors"
-                        title="Delete address"
-                      >
-                        <TrashIcon className="h-4 w-4" />
                       </button>
                     </div>
                   </td>
@@ -466,18 +518,51 @@ const KitchenAddressesTab = () => {
             </div>
             <form onSubmit={handleSubmit} className="space-y-6">
               <div>
-                <label htmlFor="fullAddress" className="block text-sm font-medium text-neutral-700 mb-1">
-                  Address
+                <label htmlFor="addressName" className="block text-sm font-medium text-neutral-700 mb-1">
+                  Address Name <span className="text-red-600">*</span>
                 </label>
-                <textarea
+                <input
+                  type="text"
+                  id="addressName"
+                  name="addressName"
+                  value={addressForm.addressName}
+                  onChange={(e) => setAddressForm({ ...addressForm, addressName: e.target.value })}
+                  className={`w-full p-3 border border-neutral-300 rounded-xl focus:ring-primary-500 focus:border-primary-500 ${isEditMode ? '' : ''}`}
+                  placeholder="e.g. Main Branch, Warehouse, Office"
+                  required
+                />
+              </div>
+
+              <div>
+                <label htmlFor="fullAddress" className="block text-sm font-medium text-neutral-700 mb-1">
+                  Address Line 1
+                </label>
+                <input
+                  type="text"
                   id="fullAddress"
                   name="fullAddress"
-                  rows="3"
                   value={addressForm.fullAddress}
                   onChange={(e) => setAddressForm({...addressForm, fullAddress: e.target.value})}
-                  className="w-full p-3 border border-neutral-300 rounded-xl focus:ring-primary-500 focus:border-primary-500"
-                  placeholder="Enter full address"
+                  className={`w-full p-3 border border-neutral-300 rounded-xl focus:ring-primary-500 focus:border-primary-500 ${isEditMode ? 'bg-neutral-100 cursor-not-allowed' : ''}`}
+                  placeholder="Enter address line 1"
                   required
+                  disabled={isEditMode}
+                />
+              </div>
+
+              <div>
+                <label htmlFor="addressLine2" className="block text-sm font-medium text-neutral-700 mb-1">
+                  Address Line 2
+                </label>
+                <input
+                  type="text"
+                  id="addressLine2"
+                  name="addressLine2"
+                  value={addressForm.addressLine2}
+                  onChange={(e) => setAddressForm({ ...addressForm, addressLine2: e.target.value })}
+                  className={`w-full p-3 border border-neutral-300 rounded-xl focus:ring-primary-500 focus:border-primary-500 ${isEditMode ? 'bg-neutral-100 cursor-not-allowed' : ''}`}
+                  placeholder="Apartment, suite, unit, building, floor, etc."
+                  disabled={isEditMode}
                 />
               </div>
               
@@ -509,8 +594,8 @@ const KitchenAddressesTab = () => {
                   name="country"
                   value={addressForm.country}
                   onChange={(e) => setAddressForm({ ...addressForm, country: e.target.value })}
-                  className="w-full p-3 border border-neutral-300 rounded-xl focus:ring-primary-500 focus:border-primary-500 bg-neutral-100 text-neutral-700"
-                  disabled
+                  className={`w-full p-3 border border-neutral-300 rounded-xl focus:ring-primary-500 focus:border-primary-500 ${isEditMode ? 'bg-neutral-100 text-neutral-700' : ''}`}
+                  disabled={isEditMode}
                   required
                 >
                   {addressData.countries.map(c => (
@@ -528,7 +613,8 @@ const KitchenAddressesTab = () => {
                   name="cityZone"
                   value={addressForm.cityZone}
                   onChange={(e) => setAddressForm({ ...addressForm, cityZone: e.target.value })}
-                  className="w-full p-3 border border-neutral-300 rounded-xl focus:ring-primary-500 focus:border-primary-500"
+                  className={`w-full p-3 border border-neutral-300 rounded-xl focus:ring-primary-500 focus:border-primary-500 ${isEditMode ? 'bg-neutral-100 text-neutral-700' : ''}`}
+                  disabled={isEditMode}
                 >
                   <option value="">Select zone</option>
                   {(addressData.cityZones['KHI'] || []).map(z => (
@@ -562,8 +648,9 @@ const KitchenAddressesTab = () => {
                   name="locationLink"
                   value={addressForm.locationLink}
                   onChange={(e) => setAddressForm({...addressForm, locationLink: e.target.value})}
-                  className="w-full p-3 border border-neutral-300 rounded-xl focus:ring-primary-500 focus:border-primary-500"
+                  className={`w-full p-3 border border-neutral-300 rounded-xl focus:ring-primary-500 focus:border-primary-500 ${isEditMode ? 'bg-neutral-100 cursor-not-allowed' : ''}`}
                   placeholder="Enter location link (Google Maps, etc.)"
+                  disabled={isEditMode}
                 />
               </div>
               
@@ -571,7 +658,8 @@ const KitchenAddressesTab = () => {
                 <button
                   type="button"
                   onClick={handleGetLocation}
-                  className="px-4 py-2 bg-primary-600 text-white rounded-full hover:bg-primary-700 transition-colors text-sm font-medium"
+                  className={`px-4 py-2 rounded-full text-sm font-medium ${isEditMode ? 'bg-neutral-300 text-neutral-600 cursor-not-allowed' : 'bg-primary-600 text-white hover:bg-primary-700 transition-colors'}`}
+                  disabled={isEditMode}
                 >
                   Get Location
                 </button>
@@ -621,19 +709,18 @@ const KitchenAddressesTab = () => {
               )}
               
               <div>
-                <label htmlFor="status" className="block text-sm font-medium text-neutral-700 mb-1">
-                  Status
+                <label htmlFor="deliveryInstructions" className="block text-sm font-medium text-neutral-700 mb-1">
+                  Instruction for Delivery Rider
                 </label>
-                <select
-                  id="status"
-                  name="status"
-                  value={addressForm.status}
-                  onChange={(e) => setAddressForm({...addressForm, status: e.target.value})}
+                <textarea
+                  id="deliveryInstructions"
+                  name="deliveryInstructions"
+                  rows={3}
+                  value={addressForm.deliveryInstructions}
+                  onChange={(e) => setAddressForm({ ...addressForm, deliveryInstructions: e.target.value })}
                   className="w-full p-3 border border-neutral-300 rounded-xl focus:ring-primary-500 focus:border-primary-500"
-                >
-                  <option value="active">Active</option>
-                  <option value="inactive">Inactive</option>
-                </select>
+                  placeholder="Add any instructions for the delivery rider (optional)"
+                />
               </div>
               
               <div className="flex justify-end space-x-3 pt-3">
@@ -708,6 +795,22 @@ const KitchenAddressesTab = () => {
           }}
           comment={updateComment}
           onCommentChange={setUpdateComment}
+          variant="primary"
+        />
+      )}
+
+      {/* Activate Address Confirmation Modal */}
+      {showActivateConfirmModal && selectedAddress && (
+        <ConfirmationModal
+          isOpen={showActivateConfirmModal}
+          title="Activate Address"
+          message={`Are you sure you want to activate this address?`}
+          confirmText="Activate"
+          cancelText="Cancel"
+          onConfirm={handleConfirmActivateAddress}
+          onCancel={() => { setShowActivateConfirmModal(false); setActivateComment(''); setSelectedAddress(null); }}
+          comment={activateComment}
+          onCommentChange={setActivateComment}
           variant="primary"
         />
       )}

@@ -320,32 +320,12 @@ const KitchenPartnersTab = () => {
 
   // Get status badge
   const getUserStatusBadge = (status) => {
-    switch (status) {
-      case 'active':
-        return (
-          <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
-            Active
-          </span>
-        );
-      case 'pending':
-        return (
-          <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-yellow-100 text-yellow-800">
-            Pending
-          </span>
-        );
-      case 'suspended':
-        return (
-          <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-800">
-            Suspended
-          </span>
-        );
-      default:
-        return (
-          <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-neutral-100 text-neutral-800">
-            {status}
-          </span>
-        );
-    }
+    const label = (status || 'N/A');
+    return (
+      <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
+        {label}
+      </span>
+    );
   };
 
   if (isLoadingUsers) {
@@ -393,7 +373,7 @@ const KitchenPartnersTab = () => {
             <thead className="bg-neutral-50">
               <tr>
                 <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-neutral-500 uppercase tracking-wider">
-                  User
+                  Partner
                 </th>
                 <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-neutral-500 uppercase tracking-wider">
                   Role
@@ -404,9 +384,7 @@ const KitchenPartnersTab = () => {
                 <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-neutral-500 uppercase tracking-wider">
                   PIN Status
                 </th>
-                <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-neutral-500 uppercase tracking-wider">
-                  Last Active
-                </th>
+                
                 <th scope="col" className="px-6 py-3 text-right text-xs font-medium text-neutral-500 uppercase tracking-wider">
                   Actions
                 </th>
@@ -416,21 +394,18 @@ const KitchenPartnersTab = () => {
               {kitchenUsers.map((user, index) => (
                 <tr key={index}>
                   <td className="px-6 py-4 whitespace-nowrap">
-                    <div className="flex items-center">
-                      <div className="flex-shrink-0 h-10 w-10">
-                        <div className="h-10 w-10 rounded-full bg-primary-500 flex items-center justify-center text-white font-medium">
-                          {user.name ? user.name.charAt(0) : 'N'}
-                        </div>
-                      </div>
-                      <div className="ml-4">
-                        <div className="text-sm font-medium text-neutral-900">{user.name || 'N/A'}</div>
-                        <div className="text-sm text-neutral-500">{user.mobilenumber || user.email || 'N/A'}</div>
-                      </div>
-                    </div>
+                    <div className="text-sm font-medium text-neutral-900">{user.name || 'N/A'}</div>
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap">
                     <div className="text-sm text-neutral-900">
-                      {user.roles && user.roles.length > 0 ? user.roles.join(', ') : 'N/A'}
+                      {(() => {
+                        const roles = (user.roles && user.roles.length > 0) ? user.roles : ['N/A'];
+                        const transformed = roles.map(r => {
+                          const t = String(r || '').toUpperCase();
+                          return t === 'USER' ? 'PARTNER' : t;
+                        });
+                        return transformed.join(', ');
+                      })()}
                     </div>
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap">
@@ -440,11 +415,6 @@ const KitchenPartnersTab = () => {
                     <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-800">
                       N/A
                     </span>
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    <div className="text-sm text-neutral-900">
-                      {user.joinedAt ? getRelativeTime(new Date(user.joinedAt)) : 'N/A'}
-                    </div>
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
                     <div className="flex justify-end space-x-2">
@@ -468,13 +438,6 @@ const KitchenPartnersTab = () => {
                         title="View user"
                       >
                         <EyeIcon className="h-4 w-4" />
-                      </button>
-                      <button
-                        onClick={() => handleDeleteUser(user)}
-                        className="text-red-600 hover:text-red-900 transition-colors"
-                        title="Delete user"
-                      >
-                        <TrashIcon className="h-4 w-4" />
                       </button>
                     </div>
                   </td>
