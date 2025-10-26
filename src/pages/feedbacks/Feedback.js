@@ -11,6 +11,7 @@ import {
 } from '@heroicons/react/24/outline';
 
 const Feedback = () => {
+  // Filters
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
   // removed delete flow
@@ -18,6 +19,10 @@ const Feedback = () => {
   const [mobileFilter, setMobileFilter] = useState('');
   const [kitchenFilter, setKitchenFilter] = useState('');
   const [orderIdFilter, setOrderIdFilter] = useState('');
+  const [customerNameFilter, setCustomerNameFilter] = useState('');
+  const [customerEmailFilter, setCustomerEmailFilter] = useState('');
+  const [kitchenIdFilter, setKitchenIdFilter] = useState('');
+  const [feedbackDateFilter, setFeedbackDateFilter] = useState(''); // yyyy-mm-dd
   const [sortField, setSortField] = useState('');
   const [sortDirection, setSortDirection] = useState('asc');
 
@@ -34,12 +39,14 @@ const Feedback = () => {
     id: f.id,
     customerName: f.customerName || '-',
     customerPhone: f.customerPhone || '',
+    customerEmail: f.customerEmail || '',
     customerId: f.customerId || '',
     kitchenId: f.kitchenId || '',
     kitchenName: f.kitchenName || '-',
     orderId: f.orderId || f.orderName || null,
     dishName: f.orderName || null,
-    status: (f.status || '').toLowerCase(),
+    status: f.status || '', // preserve original for display
+    statusLower: (f.status || '').toLowerCase(), // for filtering/sorting
     rating: Number(f.feedbackRating) || 0,
     createdAt: f.createdAt || ''
   }));
@@ -47,15 +54,29 @@ const Feedback = () => {
   // Use API data exclusively
   const sourceList = apiFeedbacks;
 
-  // Filter feedbacks based on search and status
+  // Filter feedbacks based on requested filters only
   const filteredFeedbacks = sourceList.filter(feedback => {
     const matchesSearch = (feedback.customerName || '').toLowerCase().includes(searchTerm.toLowerCase());
+    const matchesCustomerName = (feedback.customerName || '').toLowerCase().includes(customerNameFilter.toLowerCase());
+    const matchesCustomerEmail = (feedback.customerEmail || '').toLowerCase().includes(customerEmailFilter.toLowerCase());
     const matchesMobile = (feedback.customerPhone || '').includes(mobileFilter);
     const matchesKitchen = (feedback.kitchenName || '').toLowerCase().includes(kitchenFilter.toLowerCase());
+    const matchesKitchenId = (feedback.kitchenId || '').toLowerCase().includes(kitchenIdFilter.toLowerCase());
     const matchesOrderId = feedback.orderId ? String(feedback.orderId).toLowerCase().includes(orderIdFilter.toLowerCase()) : true;
-    const matchesStatus = statusFilter === 'all' || (feedback.status || '').toLowerCase() === statusFilter.toLowerCase();
+    const matchesStatus = statusFilter === 'all' || (feedback.statusLower || '') === statusFilter.toLowerCase();
+    const matchesFeedbackDate = (() => {
+      if (!feedbackDateFilter) return true;
+      if (!feedback.createdAt) return false;
+      const fDate = new Date(feedback.createdAt);
+      if (Number.isNaN(fDate.getTime())) return false;
+      const yyyy = fDate.getFullYear();
+      const mm = String(fDate.getMonth() + 1).padStart(2, '0');
+      const dd = String(fDate.getDate()).padStart(2, '0');
+      const onlyDate = `${yyyy}-${mm}-${dd}`;
+      return onlyDate === feedbackDateFilter;
+    })();
     
-    return matchesSearch && matchesMobile && matchesKitchen && matchesOrderId && matchesStatus;
+    return matchesSearch && matchesCustomerName && matchesCustomerEmail && matchesMobile && matchesKitchen && matchesKitchenId && matchesOrderId && matchesStatus && matchesFeedbackDate;
   }).sort((a, b) => {
     if (!sortField) return 0;
     
@@ -65,6 +86,9 @@ const Feedback = () => {
     if (sortField === 'rating') {
       aValue = Number(aValue);
       bValue = Number(bValue);
+    } else if (sortField === 'status') {
+      aValue = a.statusLower;
+      bValue = b.statusLower;
     } else if (typeof aValue === 'string') {
       aValue = aValue.toLowerCase();
       bValue = bValue.toLowerCase();
@@ -76,20 +100,13 @@ const Feedback = () => {
   });
 
   const getStatusBadge = (statusRaw) => {
-    const status = String(statusRaw || '').toLowerCase();
-    if (['pending','initiated'].includes(status)) {
-      return <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-yellow-100 text-yellow-800">{status === 'initiated' ? 'Initiated' : 'Pending'}</span>;
-    }
-    if (['approved','resolved','completed','done'].includes(status)) {
-      return <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">{status === 'approved' ? 'Approved' : 'Resolved'}</span>;
-    }
-    if (['rejected','closed'].includes(status)) {
-      return <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-800">Rejected</span>;
-    }
-    if (['in_progress','in progress','processing'].includes(status)) {
-      return <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">In Progress</span>;
-    }
-    return <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-800">{status || 'Unknown'}</span>;
+    const sUpper = String(statusRaw || '').toUpperCase();
+    if (sUpper === 'PENDING_AT_KITCHEN') return <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">{statusRaw}</span>;
+    if (sUpper === 'INITIATED' || sUpper === 'PENDING') return <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-yellow-100 text-yellow-800">{statusRaw}</span>;
+    if (['APPROVED','RESOLVED','COMPLETED','DONE'].includes(sUpper)) return <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">{statusRaw}</span>;
+    if (['REJECTED','CLOSED'].includes(sUpper)) return <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-800">{statusRaw}</span>;
+    if (['IN_PROGRESS','IN PROGRESS','PROCESSING'].includes(sUpper)) return <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">{statusRaw}</span>;
+    return <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-800">{statusRaw || 'Unknown'}</span>;
   };
 
   // delete handlers removed
@@ -108,6 +125,24 @@ const Feedback = () => {
     return sortDirection === 'asc' ? 
       <ChevronUpIcon className="h-4 w-4 inline ml-1" /> : 
       <ChevronDownIcon className="h-4 w-4 inline ml-1" />;
+  };
+
+  // Apply and reset filters (UI parity with KitchensList)
+  const applyFiltersNow = () => {
+    // Filters are already live-bound; keep this to mirror UX and close panel
+    setShowAdvancedFilters(false);
+  };
+  const resetFilters = () => {
+    setSearchTerm('');
+    setStatusFilter('all');
+    setShowAdvancedFilters(false);
+    setMobileFilter('');
+    setKitchenFilter('');
+    setOrderIdFilter('');
+    setCustomerNameFilter('');
+    setCustomerEmailFilter('');
+    setKitchenIdFilter('');
+    setFeedbackDateFilter('');
   };
 
   if (!canViewFeedbackList) {
@@ -192,56 +227,58 @@ const Feedback = () => {
         <div className="mt-4 p-4 bg-gray-50 rounded-lg border border-gray-200">
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Mobile Number
-              </label>
-              <input
-                type="text"
-                className="block w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-1 focus:ring-primary-500 focus:border-primary-500"
-                placeholder="Search mobile..."
-                value={mobileFilter}
-                onChange={(e) => setMobileFilter(e.target.value)}
-              />
+              <label className="block text-sm font-medium text-gray-700 mb-1">Customer Mobile</label>
+              <input type="text" className="block w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-1 focus:ring-primary-500 focus:border-primary-500" placeholder="Search mobile..." value={mobileFilter} onChange={(e) => setMobileFilter(e.target.value)} />
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Kitchen Name
-              </label>
-              <input
-                type="text"
-                className="block w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-1 focus:ring-primary-500 focus:border-primary-500"
-                placeholder="Search kitchen..."
-                value={kitchenFilter}
-                onChange={(e) => setKitchenFilter(e.target.value)}
-              />
+              <label className="block text-sm font-medium text-gray-700 mb-1">Customer Email</label>
+              <input type="text" className="block w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-1 focus:ring-primary-500 focus:border-primary-500" placeholder="Search email..." value={customerEmailFilter} onChange={(e) => setCustomerEmailFilter(e.target.value)} />
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Order ID
-              </label>
-              <input
-                type="text"
-                className="block w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-1 focus:ring-primary-500 focus:border-primary-500"
-                placeholder="Search order ID..."
-                value={orderIdFilter}
-                onChange={(e) => setOrderIdFilter(e.target.value)}
-              />
+              <label className="block text-sm font-medium text-gray-700 mb-1">Customer Name</label>
+              <input type="text" className="block w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-1 focus:ring-primary-500 focus:border-primary-500" placeholder="Search name..." value={customerNameFilter} onChange={(e) => setCustomerNameFilter(e.target.value)} />
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Status
-              </label>
-              <select
-                className="block w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-1 focus:ring-primary-500 focus:border-primary-500"
-                value={statusFilter}
-                onChange={(e) => setStatusFilter(e.target.value)}
-              >
+              <label className="block text-sm font-medium text-gray-700 mb-1">Order ID</label>
+              <input type="text" className="block w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-1 focus:ring-primary-500 focus:border-primary-500" placeholder="Search order ID..." value={orderIdFilter} onChange={(e) => setOrderIdFilter(e.target.value)} />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Kitchen Name</label>
+              <input type="text" className="block w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-1 focus:ring-primary-500 focus:border-primary-500" placeholder="Search kitchen..." value={kitchenFilter} onChange={(e) => setKitchenFilter(e.target.value)} />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Kitchen ID</label>
+              <input type="text" className="block w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-1 focus:ring-primary-500 focus:border-primary-500" placeholder="Search kitchen ID..." value={kitchenIdFilter} onChange={(e) => setKitchenIdFilter(e.target.value)} />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Status</label>
+              <select className="block w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-1 focus:ring-primary-500 focus:border-primary-500" value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)}>
                 <option value="all">All Status</option>
+                <option value="initiated">Initiated</option>
                 <option value="pending">Pending</option>
+                <option value="pending_at_kitchen">Pending at Kitchen</option>
                 <option value="approved">Approved</option>
                 <option value="rejected">Rejected</option>
               </select>
             </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Feedback Date</label>
+              <input type="date" className="block w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-1 focus:ring-primary-500 focus:border-primary-500" value={feedbackDateFilter} onChange={(e) => setFeedbackDateFilter(e.target.value)} />
+            </div>
+          </div>
+          <div className="mt-4 flex items-center gap-3">
+            <button
+              onClick={applyFiltersNow}
+              className="px-4 py-2 bg-primary-600 text-white rounded-md hover:bg-primary-700 transition-colors text-sm"
+            >
+              Search
+            </button>
+            <button
+              onClick={resetFilters}
+              className="px-4 py-2 bg-white border border-neutral-300 text-neutral-700 rounded-md hover:bg-neutral-50 transition-colors text-sm"
+            >
+              Reset Filters
+            </button>
           </div>
         </div>
       )}
