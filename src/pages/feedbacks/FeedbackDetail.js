@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { useParams, useNavigate, Link } from 'react-router-dom';
+import { useParams, useNavigate, Link, useLocation } from 'react-router-dom';
 import { 
   ArrowLeftIcon,
   UserIcon,
@@ -22,6 +22,7 @@ import { useGetFeedbackByIdQuery, useUpdateFeedbackDetailsMutation, useSendFeedb
 const FeedbackDetail = () => {
   const { id } = useParams();
   const navigate = useNavigate();
+  const location = useLocation();
   const { hasPermission } = usePermissions();
   const canEditFeedback = hasPermission('admin.feedback.edit');
   const canSendToKitchen = hasPermission('admin.feedback.send.to.kitchen');
@@ -447,7 +448,7 @@ const FeedbackDetail = () => {
                   Customer Information
                 </h3>
                 <button
-                  onClick={() => navigate(`/customers/${feedback.customerId}`)}
+                  onClick={() => navigate(`/customers/${feedback.customerId}`, { state: { from: location } })}
                   className="inline-flex items-center px-3 py-1.5 border border-transparent text-xs font-medium rounded-md text-white bg-primary-600 hover:bg-primary-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500"
                 >
                   Show Details
@@ -475,6 +476,7 @@ const FeedbackDetail = () => {
                   <dd className="text-sm text-gray-900 flex items-center space-x-2">
                     <Link 
                       to={`/customers/${feedback.customerId}`}
+                      state={{ from: location }}
                       className="text-primary-600 hover:text-primary-800 hover:underline"
                     >
                       {feedback.customerId}
@@ -503,7 +505,7 @@ const FeedbackDetail = () => {
                 </h3>
                 {feedback.kitchenId && (
                   <button
-                    onClick={() => navigate(`/kitchens/${feedback.kitchenId}`)}
+                    onClick={() => navigate(`/kitchens/${feedback.kitchenId}`, { state: { from: location } })}
                     className="inline-flex items-center px-3 py-1.5 border border-transparent text-xs font-medium rounded-md text-white bg-primary-600 hover:bg-primary-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500"
                   >
                     Show Details

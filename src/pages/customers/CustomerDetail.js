@@ -1,10 +1,12 @@
 import React, { useState, useEffect } from 'react';
-import { useParams, Link } from 'react-router-dom';
+import { useParams, Link, useNavigate, useLocation } from 'react-router-dom';
 import { ArrowLeftIcon, EnvelopeIcon, PhoneIcon, PlusIcon,EyeIcon, PencilIcon, TrashIcon, XMarkIcon } from '@heroicons/react/24/outline';
 import ConfirmationModal from '../../components/ConfirmationModal';
 
 const CustomerDetail = () => {
   const { id } = useParams();
+  const navigate = useNavigate();
+  const location = useLocation();
   const [customer, setCustomer] = useState(null);
   const [activeTab, setActiveTab] = useState('info');
   const [isLoading, setIsLoading] = useState(true);
@@ -315,12 +317,23 @@ const CustomerDetail = () => {
       {/* Header with back button */}
       <div className="mb-6">
         <div className="flex items-center">
-          <Link
-            to="/customers"
+          <button
+            type="button"
+            onClick={() => {
+              const from = location.state?.from;
+              if (from && from.pathname) {
+                navigate(from.pathname + (from.search || ''), { replace: true });
+              } else if (window.history.length > 1) {
+                navigate(-1);
+              } else {
+                navigate('/customers');
+              }
+            }}
             className="mr-4 p-2 rounded-full hover:bg-gray-100"
+            aria-label="Go back"
           >
             <ArrowLeftIcon className="h-5 w-5 text-gray-500" />
-          </Link>
+          </button>
           <div>
             <h1 className="text-2xl font-semibold text-gray-900">{customer.name}</h1>
             <p className="text-sm text-gray-500">

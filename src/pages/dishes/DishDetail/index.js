@@ -1,7 +1,7 @@
 import { useGetDishByIdQuery, useUpdateDishByIdMutation } from '../../../store/api/modules/dishes/dishesApi';
 import { skipToken } from '@reduxjs/toolkit/query';
 import React, { useState, useEffect, createContext } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import { ArrowLeftIcon, PencilIcon } from '@heroicons/react/24/outline';
 import { useAuth } from '../../../hooks/useAuth';
 import { PERMISSIONS } from '../../../contexts/PermissionRegistry';
@@ -20,6 +20,7 @@ const DishDetail = () => {
   const params = useParams();
   const dishId = params.dishId || params.id;
   const navigate = useNavigate();
+  const location = useLocation();
   const { hasPermission } = useAuth();
   
   // Permission: admin.dish.detail.view
@@ -220,7 +221,16 @@ const DishDetail = () => {
         <div className="px-6 py-5 border-b border-neutral-200 flex justify-between items-center">
           <div className="flex items-center">
             <button
-              onClick={() => navigate('/dishes')}
+              onClick={() => {
+                const from = location.state?.from;
+                if (from && from.pathname) {
+                  navigate(from.pathname + (from.search || ''), { replace: true });
+                } else if (window.history.length > 1) {
+                  navigate(-1);
+                } else {
+                  navigate('/dishes');
+                }
+              }}
               className="mr-4 text-neutral-500 hover:text-neutral-700"
             >
               <ArrowLeftIcon className="h-5 w-5" />

@@ -1,6 +1,6 @@
 import React, { useState, useEffect, createContext } from 'react';
 import ReactDOM from 'react-dom';
-import { useParams, Link, useNavigate } from 'react-router-dom';
+import { useParams, Link, useNavigate, useLocation } from 'react-router-dom';
 import { ArrowLeftIcon, PencilIcon, XMarkIcon, PlusIcon } from '@heroicons/react/24/outline';
 import { CheckCircleIcon, ClockIcon, XCircleIcon } from '@heroicons/react/24/outline';
 import { useGetKitchenByIdQuery, useUpdateKitchenMutation, useSubmitKitchenMutation } from '../../../store/api/modules/kitchens/kitchensApi';
@@ -30,6 +30,7 @@ export const KitchenContext = createContext(null);
 const KitchenDetail = () => {
   const { id } = useParams();
   const navigate = useNavigate();
+  const location = useLocation();
   const { hasPermission } = useAuth();
   
   // Check permission first
@@ -292,9 +293,23 @@ const KitchenDetail = () => {
         {/* Header */}
         <div className="px-6 py-5 border-b border-neutral-200 flex justify-between items-center">
           <div className="flex items-center">
-            <Link to="/kitchens" className="mr-4 text-neutral-500 hover:text-neutral-700">
+            <button
+              type="button"
+              onClick={() => {
+                const from = location.state?.from;
+                if (from && from.pathname) {
+                  navigate(from.pathname + (from.search || ''), { replace: true });
+                } else if (window.history.length > 1) {
+                  navigate(-1);
+                } else {
+                  navigate('/kitchens');
+                }
+              }}
+              className="mr-4 text-neutral-500 hover:text-neutral-700"
+              aria-label="Go back"
+            >
               <ArrowLeftIcon className="h-5 w-5" />
-            </Link>
+            </button>
             <h2 className="text-xl font-medium text-neutral-900">{kitchen.name}</h2>
             <div className="ml-4">
               <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">

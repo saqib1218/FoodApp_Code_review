@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { toast } from 'react-toastify';
-import { Link } from 'react-router-dom';
+import { Link, useLocation } from 'react-router-dom';
 import {
   MagnifyingGlassIcon,
   FunnelIcon,
@@ -17,6 +17,7 @@ import { PERMISSIONS } from '../../contexts/PermissionRegistry';
 import PaginationUi from '../../components/PaginationUi';
 
 const KitchensList = () => {
+  const location = useLocation();
   const { hasPermission } = usePermissions();
   const [filteredKitchens, setFilteredKitchens] = useState([]);
   const [currentPage, setCurrentPage] = useState(1);
@@ -525,6 +526,7 @@ const KitchensList = () => {
                     <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
                       <Link
                         to={`/kitchens/${kitchen.id}`}
+                        state={{ from: location }}
                         className="text-neutral-600 hover:text-neutral-800 font-medium inline-flex items-center"
                       >
                         <EyeIcon className="h-5 w-5" />

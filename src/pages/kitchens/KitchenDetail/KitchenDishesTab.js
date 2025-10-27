@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useContext } from 'react';
 import { XMarkIcon, PencilIcon, EyeIcon, TrashIcon, PlusIcon, MagnifyingGlassIcon, FunnelIcon, ChevronUpIcon, ChevronDownIcon } from '@heroicons/react/24/outline';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import { skipToken } from '@reduxjs/toolkit/query';
 // TODO: Remove mock helpers after full migration
 import { getDishCategories } from '../../../data/dishes/mockDishes';
@@ -20,6 +20,7 @@ const KitchenDishesTab = () => {
   const kitchenId = urlKitchenId || ctxKitchenId;
   const { hasPermission } = useAuth();
   const navigate = useNavigate();
+  const location = useLocation();
   
   // State variables
   const [dishes, setDishes] = useState([]);
@@ -77,7 +78,7 @@ const KitchenDishesTab = () => {
 
   // Handle dish view - navigate to detail page
   const handleViewDish = (dish) => {
-    navigate(`/dishes/${dish.id}`);
+    navigate(`/dishes/${dish.id}` , { state: { from: location } });
   };
   const handleAddDish = () => {
     setShowAddDishModal(true);
@@ -85,7 +86,7 @@ const KitchenDishesTab = () => {
 
   // Handle edit dish - navigate to dish detail page
   const handleEditDish = (dish) => {
-    navigate(`/dishes/${dish.id}`);
+    navigate(`/dishes/${dish.id}`, { state: { from: location } });
   };
 
   // Handle view dish - open view modal
