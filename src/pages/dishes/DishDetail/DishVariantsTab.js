@@ -1,7 +1,7 @@
   // Mutations
 
 import React, { useState, useEffect, useContext } from 'react';
-import { PlusIcon, PencilIcon, EyeIcon, TrashIcon, XMarkIcon } from '@heroicons/react/24/outline';
+import { PlusIcon, PencilIcon, EyeIcon, TrashIcon, XMarkIcon, EllipsisVerticalIcon } from '@heroicons/react/24/outline';
 import { useAuth } from '../../../hooks/useAuth';
 import { PERMISSIONS } from '../../../contexts/PermissionRegistry';
 import { DishContext } from './index';
@@ -65,6 +65,19 @@ const DishVariantsTab = () => {
     isActive: true,
   });
   const [deleteComment, setDeleteComment] = useState('');
+  // 3-dots actions menu state
+  const [openMenuFor, setOpenMenuFor] = useState(null); // row index key
+  const [openMenuPos, setOpenMenuPos] = useState({ top: 0, left: 0 });
+  const handleOpenMenu = (e, rowKey) => {
+    const rect = e.currentTarget.getBoundingClientRect();
+    const menuWidth = 176; // 44 * 4
+    const menuHeight = 112; // approx
+    const gap = 8;
+    const top = rect.top + window.scrollY - menuHeight - gap; // open upward
+    const left = rect.right + window.scrollX - menuWidth; // right align
+    setOpenMenuPos({ top, left });
+    setOpenMenuFor(openMenuFor === rowKey ? null : rowKey);
+  };
   
   // Form state
   const [variantForm, setVariantForm] = useState({
@@ -268,9 +281,13 @@ const DishVariantsTab = () => {
         dishVariantId: v.dishVariantId ,
         title: v.title || v.name || '-',
         description: v.description || '',
+        unit: v.unit || '',
         unitQuantity: v.unitQuantity ?? v.quantity ?? v.defaultQuantity ?? '',
+        minOrderQuantity: v.minOrderQuantity ?? v.minQty ?? '',
         price: v.price ?? v.amount ?? '',
         currency: v.currency || 'PKR',
+        perOrderLimit: v.perOrderLimit ?? '',
+        dailyLimit: v.dailyLimit ?? '',
         status: v.status || (v.isActive ? 'active' : 'inactive'),
         isActive: typeof v.isActive === 'boolean' ? v.isActive : (String(v.status).toLowerCase() === 'active'),
         createdAt: v.createdAt || '',
@@ -283,9 +300,20 @@ const DishVariantsTab = () => {
   // Handle form changes
   const handleFormChange = (e) => {
     const { name, value } = e.target;
+    // Prevent negative values for numeric fields
+    const numericFields = new Set(['price','minQuantity','maxQuantity','quantity','perLimit','dailyLimit']);
+    let nextValue = value;
+    if (numericFields.has(name)) {
+      if (value === '' || value === null || typeof value === 'undefined') {
+        nextValue = '';
+      } else {
+        const num = Number(value);
+        nextValue = Number.isNaN(num) ? '' : (num < 0 ? '0' : value);
+      }
+    }
     setVariantForm(prev => ({
       ...prev,
-      [name]: value
+      [name]: nextValue
     }));
   };
 
@@ -349,7 +377,22 @@ const DishVariantsTab = () => {
 
   // Handle view variant
   const handleViewVariant = (variant) => {
-    setSelectedVariant(variant);
+    // Map list row shape to view modal shape expected by UI
+    const viewVariant = {
+      name: variant.title || '-',
+      description: variant.description || '-',
+      unit: variant.unit || '',
+      quantity: variant.unitQuantity ?? '',
+      minQuantity: variant.minOrderQuantity ?? '',
+      maxQuantity: variant.unitQuantity ?? '',
+      price: variant.price ?? '',
+      currency: variant.currency || 'PKR',
+      perLimit: variant.perOrderLimit || '',
+      dailyLimit: variant.dailyLimit || '',
+      status: variant.status || (variant.isActive ? 'active' : 'inactive'),
+      createdAt: variant.createdAt || '',
+    };
+    setSelectedVariant(viewVariant);
     setShowViewModal(true);
   };
 
@@ -391,7 +434,18 @@ const DishVariantsTab = () => {
 
   const handleEditFormChange = (e) => {
     const { name, value } = e.target;
-    setEditVariantForm(prev => ({ ...prev, [name]: value }));
+    // Prevent negative values for numeric fields
+    const numericFields = new Set(['price','minQuantity','maxQuantity','quantity','perOrderLimit','dailyLimit']);
+    let nextValue = value;
+    if (numericFields.has(name)) {
+      if (value === '' || value === null || typeof value === 'undefined') {
+        nextValue = '';
+      } else {
+        const num = Number(value);
+        nextValue = Number.isNaN(num) ? '' : (num < 0 ? '0' : value);
+      }
+    }
+    setEditVariantForm(prev => ({ ...prev, [name]: nextValue }));
   };
 
   const handleUpdateVariant = async () => {
@@ -505,65 +559,50 @@ const DishVariantsTab = () => {
               <table className="min-w-full divide-y divide-neutral-200">
                 <thead className="bg-neutral-50">
                   <tr>
-                    <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-neutral-500 uppercase tracking-wider">Title</th>
-                    <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-neutral-500 uppercase tracking-wider">Unit Quantity</th>
-                    <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-neutral-500 uppercase tracking-wider">Price</th>
-                    <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-neutral-500 uppercase tracking-wider">Currency</th>
-                    {isHomeCatering && (
-                      <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-neutral-500 uppercase tracking-wider">Items</th>
-                    )}
+                    <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-neutral-500 uppercase tracking-wider">Dish ID</th>
+                    <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-neutral-500 uppercase tracking-wider">Dish Title</th>
+                    <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-neutral-500 uppercase tracking-wider">Category</th>
+                    <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-neutral-500 uppercase tracking-wider">Price / Currency</th>
+                    <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-neutral-500 uppercase tracking-wider">Unit / Quantity</th>
                     <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-neutral-500 uppercase tracking-wider">Status</th>
                     <th scope="col" className="px-6 py-3 text-right text-xs font-medium text-neutral-500 uppercase tracking-wider">Actions</th>
                   </tr>
                 </thead>
                 <tbody className="bg-white divide-y divide-neutral-200">
-                  {variants.map((variant) => (
+                  {variants.map((variant, index) => (
                     <tr key={variant.id} className="hover:bg-neutral-50">
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <div className="text-sm text-neutral-900">{dishId}</div>
+                      </td>
                       <td className="px-6 py-4 whitespace-nowrap">
                         <div className="text-sm font-medium text-neutral-900">{variant.title}</div>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
-                        <div className="text-sm text-neutral-900">{variant.unitQuantity || '-'}</div>
+                        <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
+                          {dish?.category || '-'}
+                        </span>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
-                        <div className="text-sm font-medium text-neutral-900">{variant.price}</div>
+                        <div className="text-sm text-neutral-900">{variant.price} {variant.currency}</div>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
-                        <div className="text-sm text-neutral-900">{variant.currency || '-'}</div>
+                        <div className="text-sm text-neutral-900">{variant.unit || '-'}{variant.unit ? ' / ' : ''}{variant.unitQuantity || '-'}</div>
                       </td>
-                      {isHomeCatering && (
-                        <td className="px-6 py-4">
-                          <button
-                            onClick={() => handleOpenItems(variant)}
-                            className="inline-flex items-center px-2.5 py-1.5 border border-transparent text-xs font-medium rounded-md text-white bg-primary-600 hover:bg-primary-700"
-                            title="View items"
-                          >
-                            View Items
-                          </button>
-                        </td>
-                      )}
                       <td className="px-6 py-4 whitespace-nowrap">
-                        <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${String(variant.status).toLowerCase() === 'active' ? 'bg-green-100 text-green-800' : 'bg-yellow-100 text-yellow-800'}`}>
+                        <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
                           {variant.status}
                         </span>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                        <div className="flex justify-end space-x-2">
-                          {canViewVariantDetail && (
-                            <button
-                              onClick={() => handleEditVariant(variant)}
-                              className="text-blue-600 hover:text-blue-900 transition-colors"
-                              title="Edit variant"
-                            >
-                              <PencilIcon className="h-4 w-4" />
-                            </button>
-                          )}
+                        <div className="relative inline-block text-left">
                           <button
-                            onClick={() => handleViewVariant(variant)}
-                            className="text-green-600 hover:text-green-900 transition-colors"
-                            title="View variant"
+                            type="button"
+                            className="inline-flex items-center justify-center p-2 rounded-full hover:bg-neutral-100 text-neutral-700"
+                            onClick={(e) => handleOpenMenu(e, `row-${index}`)}
+                            aria-haspopup="menu"
+                            aria-expanded={openMenuFor === `row-${index}`}
                           >
-                            <EyeIcon className="h-4 w-4" />
+                            <EllipsisVerticalIcon className="h-5 w-5" />
                           </button>
                         </div>
                       </td>
@@ -572,6 +611,42 @@ const DishVariantsTab = () => {
                 </tbody>
               </table>
             )}
+          </div>
+        </div>
+      )}
+
+      {/* Floating row actions menu */}
+      {openMenuFor && (
+        <div className="fixed inset-0 z-[70]" onClick={() => setOpenMenuFor(null)}>
+          <div
+            className="absolute w-44 rounded-md shadow-lg bg-white ring-1 ring-black ring-opacity-5"
+            style={{ top: openMenuPos.top, left: openMenuPos.left }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="py-1">
+              {(() => {
+                const idx = Number(String(openMenuFor).replace('row-',''));
+                const row = variants[idx];
+                if (!row) return null;
+                return (
+                  <>
+                    <button
+                      className="w-full text-left px-4 py-2 text-sm text-neutral-700 hover:bg-neutral-50"
+                      onClick={() => { handleViewVariant(row); setOpenMenuFor(null); }}
+                    >
+                      View Variant
+                    </button>
+                    <button
+                      className="w-full text-left px-4 py-2 text-sm text-neutral-700 hover:bg-neutral-50"
+                      onClick={() => { handleEditVariant(row); setOpenMenuFor(null); }}
+                      disabled={!canEditVariant}
+                    >
+                      Edit Variant
+                    </button>
+                  </>
+                );
+              })()}
+            </div>
           </div>
         </div>
       )}
@@ -933,7 +1008,7 @@ const DishVariantsTab = () => {
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-neutral-700 mb-1">
-                    Description
+                  Variant Description
                   </label>
                   <textarea
                     name="description"
@@ -1007,20 +1082,6 @@ const DishVariantsTab = () => {
                       />
                     </div>
                   )}
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-neutral-700 mb-1">
-                    Status
-                  </label>
-                  <select
-                    name="status"
-                    value={variantForm.status}
-                    onChange={handleFormChange}
-                    className="w-full p-3 border border-neutral-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
-                  >
-                    <option value="active">Active</option>
-                    <option value="inactive">Inactive</option>
-                  </select>
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-neutral-700 mb-1">

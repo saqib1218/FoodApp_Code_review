@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { EyeIcon, PlusIcon, MagnifyingGlassIcon } from '@heroicons/react/24/outline';
+import { EyeIcon, PlusIcon, MagnifyingGlassIcon, FunnelIcon } from '@heroicons/react/24/outline';
 import { useAuth } from '../../hooks/useAuth';
 import { PERMISSIONS } from '../../contexts/PermissionRegistry';
 import AddDishModal from '../../components/AddDishModal';
@@ -23,7 +23,12 @@ const DishesList = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
   const [showAddDishModal, setShowAddDishModal] = useState(false);
-  const [selectedKitchen, setSelectedKitchen] = useState('');
+  // Filters UI (align with KitchensList)
+  const defaultFilters = { category: '', status: '', kitchenName: '', dishId: '' };
+  const [filters, setFilters] = useState(defaultFilters);
+  const [pendingFilters, setPendingFilters] = useState(defaultFilters);
+  const [showFilters, setShowFilters] = useState(false);
+  const [filterOptions, setFilterOptions] = useState({ categories: [], statuses: [] });
   
   // Dialogue box state for feedback
   const [dialogueBox, setDialogueBox] = useState({
@@ -71,26 +76,40 @@ const DishesList = () => {
           ? allDishesResp
           : [];
       setDishes(list);
-      // Derive kitchens list for filter from nested kitchen object
+      // Derive kitchens list (may be used elsewhere)
       const uniqKitchens = Array.from(new Map(list
         .filter(d => d.kitchen && d.kitchen.id)
         .map(d => [d.kitchen.id, { id: d.kitchen.id, name: d.kitchen.name || d.kitchen.id }])
       ).values());
       setKitchens(uniqKitchens);
+      // Build filter options similar to KitchensList
+      const categories = Array.from(new Set(list.map(d => (d.category?.name || d.category || '').toString()).filter(Boolean)));
+      const statuses = Array.from(new Set(list.map(d => (d.status || (d.isActive ? 'active' : 'inactive'))).filter(Boolean)));
+      setFilterOptions({ categories, statuses });
     }
   }, [allDishesResp, isAllDishesLoading]);
 
   // Filter dishes based on search term and selected kitchen
   const filteredDishes = dishes.filter(dish => {
-    const name = dish.name || dish.dishName || '';
+    const name = (dish.name || dish.dishName || '').toString();
     const kid = dish.kitchen && dish.kitchen.id ? String(dish.kitchen.id) : '';
-    const kname = dish.kitchen && dish.kitchen.name ? dish.kitchen.name : '';
-    const matchesSearch = name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                          kid.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                          kname.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                          (dish.story || '').toLowerCase().includes(searchTerm.toLowerCase());
-    const matchesKitchen = !selectedKitchen || kid === selectedKitchen;
-    return matchesSearch && matchesKitchen;
+    const kname = dish.kitchen && dish.kitchen.name ? dish.kitchen.name.toString() : '';
+    const cat = (dish.category?.name || dish.category || '').toString();
+    const status = (dish.status || (dish.isActive ? 'active' : 'inactive')).toString();
+
+    // Search across name, kitchen id/name, story
+    const matchesSearch = searchTerm.trim() === '' || (
+      name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      kid.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      kname.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      (dish.story || '').toLowerCase().includes(searchTerm.toLowerCase())
+    );
+
+    const matchCategory = !filters.category || cat.toLowerCase() === filters.category.toLowerCase();
+    const matchStatus = !filters.status || status.toLowerCase() === filters.status.toLowerCase();
+    const matchKitchenName = !filters.kitchenName || kname.toLowerCase().includes(filters.kitchenName.toLowerCase());
+    const matchDishId = !filters.dishId || String(dish.id).toLowerCase().includes(filters.dishId.toLowerCase());
+    return matchesSearch && matchCategory && matchStatus && matchKitchenName && matchDishId;
   });
 
   // Handle add dish
@@ -161,8 +180,8 @@ const DishesList = () => {
       </div>
 
       {/* Filters and Search */}
-      <div className="mb-6 bg-white rounded-lg border border-neutral-200 p-4">
-        <div className="flex flex-col sm:flex-row gap-4">
+      <div className="mt-6 py-4">
+        <div className="flex flex-col sm:flex-row gap-4 items-stretch">
           {/* Search */}
           <div className="flex-1">
             <div className="relative">
@@ -176,23 +195,84 @@ const DishesList = () => {
               />
             </div>
           </div>
-          
-          {/* Kitchen Filter */}
-          <div className="sm:w-64">
-            <select
-              value={selectedKitchen}
-              onChange={(e) => setSelectedKitchen(e.target.value)}
-              className="w-full p-2 border border-neutral-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
+          {/* Filters toggle button */}
+          <div className="sm:w-48">
+            <button
+              onClick={() => setShowFilters(!showFilters)}
+              className="flex items-center justify-center w-full px-4 py-2 border border-neutral-300 rounded-md bg-white text-sm font-medium text-neutral-700 hover:bg-neutral-50 focus:outline-none focus:ring-1 focus:ring-primary-500 focus:border-primary-500"
             >
-              <option value="">All Kitchens</option>
-              {kitchens.map(kitchen => (
-                <option key={kitchen.id} value={kitchen.id.toString()}>
-                  {kitchen.name}
-                </option>
-              ))}
-            </select>
+              <FunnelIcon className="h-5 w-5 mr-2 text-neutral-400" />
+              Filters
+            </button>
           </div>
         </div>
+        {/* Advanced Filters like KitchensList */}
+        {showFilters && (
+          <div className="mt-4 p-4 bg-neutral-50 rounded-lg border border-neutral-200">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+              <div>
+                <label className="block text-sm font-medium text-neutral-700 mb-1">Category</label>
+                <select
+                  className="block w-full px-3 py-2 border border-neutral-300 rounded-md text-sm focus:outline-none focus:ring-1 focus:ring-primary-500 focus:border-primary-500"
+                  value={pendingFilters.category}
+                  onChange={(e) => setPendingFilters({ ...pendingFilters, category: e.target.value })}
+                >
+                  <option value="">All Categories</option>
+                  {filterOptions.categories.map((c) => (
+                    <option key={c} value={c}>{c}</option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-neutral-700 mb-1">Status</label>
+                <select
+                  className="block w-full px-3 py-2 border border-neutral-300 rounded-md text-sm focus:outline-none focus:ring-1 focus:ring-primary-500 focus:border-primary-500"
+                  value={pendingFilters.status}
+                  onChange={(e) => setPendingFilters({ ...pendingFilters, status: e.target.value })}
+                >
+                  <option value="">All Status</option>
+                  {filterOptions.statuses.map((s) => (
+                    <option key={s} value={s}>{s}</option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-neutral-700 mb-1">Kitchen Name</label>
+                <input
+                  type="text"
+                  className="block w-full px-3 py-2 border border-neutral-300 rounded-md text-sm focus:outline-none focus:ring-1 focus:ring-primary-500 focus:border-primary-500"
+                  placeholder="Search kitchen name..."
+                  value={pendingFilters.kitchenName}
+                  onChange={(e) => setPendingFilters({ ...pendingFilters, kitchenName: e.target.value })}
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-neutral-700 mb-1">Dish ID</label>
+                <input
+                  type="text"
+                  className="block w-full px-3 py-2 border border-neutral-300 rounded-md text-sm focus:outline-none focus:ring-1 focus:ring-primary-500 focus:border-primary-500"
+                  placeholder="Search dish ID..."
+                  value={pendingFilters.dishId}
+                  onChange={(e) => setPendingFilters({ ...pendingFilters, dishId: e.target.value })}
+                />
+              </div>
+            </div>
+            <div className="mt-4 flex items-center gap-3">
+              <button
+                onClick={() => setFilters(pendingFilters)}
+                className="px-4 py-2 bg-primary-600 text-white rounded-md hover:bg-primary-700 transition-colors text-sm"
+              >
+                Search
+              </button>
+              <button
+                onClick={() => { setSearchTerm(''); setFilters(defaultFilters); setPendingFilters(defaultFilters); }}
+                className="px-4 py-2 bg-white border border-neutral-300 text-neutral-700 rounded-md hover:bg-neutral-50 transition-colors text-sm"
+              >
+                Reset Filters
+              </button>
+            </div>
+          </div>
+        )}
       </div>
 
       {/* Dishes Table (permission: admin.dish.list.view) */}
@@ -205,16 +285,12 @@ const DishesList = () => {
         </div>
       ) : (
         <div className="bg-white rounded-lg border border-neutral-200 overflow-hidden">
-          <div className="px-6 py-4 border-b border-neutral-200">
-            <h4 className="text-base font-medium text-neutral-900">
-              All Dishes ({filteredDishes.length})
-            </h4>
-          </div>
+          {/* Removed list header count per request */}
           <div className="overflow-x-auto">
             {filteredDishes.length === 0 ? (
               <div className="text-center py-12 bg-neutral-50">
                 <p className="text-neutral-500">
-                  {searchTerm || selectedKitchen ? 'No dishes found matching your criteria.' : 'No dishes found.'}
+                  {searchTerm || filters.category || filters.status || filters.kitchenName || filters.dishId ? 'No dishes found matching your criteria.' : 'No dishes found.'}
                 </p>
               </div>
             ) : (
@@ -273,7 +349,6 @@ const DishesList = () => {
       <AddDishModal
         isOpen={showAddDishModal}
         onClose={() => setShowAddDishModal(false)}
-        kitchenId={selectedKitchen}
         onDishAdded={() => {
           showDialogue('success', 'Dish Added', 'Dish has been added successfully!');
         }}

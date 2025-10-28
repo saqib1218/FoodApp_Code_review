@@ -51,6 +51,16 @@ const DishDetail = () => {
     });
   };
 
+  // Render a status badge similar to KitchenDetail (always green styling, show exact status text)
+  const getStatusBadge = (status) => {
+    const label = String(status || 'N/A');
+    return (
+      <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
+        {label}
+      </span>
+    );
+  };
+
   const closeDialogue = () => {
     setDialogueBox({
       isOpen: false,
@@ -83,7 +93,7 @@ const DishDetail = () => {
         description: d.description,
         kitchenId: d.kitchen?.id || d.kitchenId,
         kitchenName: d.kitchen?.name || d.kitchenName,
-        status: d.isActive ? 'active' : 'inactive',
+        status: d.status || (d.isActive ? 'active' : 'inactive'),
         category: d.category?.name || d.category || '',
         categoryId: d.category?.id || d.categoryId || '',
         allowCustomization: d.isCustomizationAllowed,
@@ -235,9 +245,9 @@ const DishDetail = () => {
             >
               <ArrowLeftIcon className="h-5 w-5" />
             </button>
-            <div>
+            <div className="flex items-center gap-3">
               <h2 className="text-xl font-medium text-neutral-900">{dish.dishName}</h2>
-              <p className="text-sm text-neutral-500">Kitchen: {dish.kitchenName}</p>
+              {getStatusBadge(dish.status)}
             </div>
           </div>
           {canEditDish && (
@@ -258,40 +268,65 @@ const DishDetail = () => {
         </div>
 
         {/* Basic Info */}
-        <div className="px-6 py-5 border-b border-neutral-200 grid grid-cols-1 md:grid-cols-2 gap-6">
+        <div className="px-6 py-5 border-b border-neutral-200 grid grid-cols-1 md:grid-cols-2 gap-8">
+          {/* Left column */}
           <div>
-            {dish.story && (
-              <div className="mb-2">
-                <h3 className="text-sm font-medium text-neutral-500">Story</h3>
-                <p className="mt-1 text-neutral-900">{dish.story}</p>
-              </div>
-            )}
-            {dish.description && (
-              <div className="mb-2">
-                <h3 className="text-sm font-medium text-neutral-500">Description</h3>
-                <p className="mt-1 text-neutral-900">{dish.description}</p>
-              </div>
-            )}
+            <dl className="space-y-4">
+            {dish.kitchenName && dish.kitchenId && (
+                <div>
+                  <dt className="text-sm font-medium text-neutral-500">Kitchen</dt>
+                  <dd className="mt-1">
+                    <button
+                      type="button"
+                      onClick={() => navigate(`/kitchens/${dish.kitchenId}`, { state: { from: location } })}
+                      className="text-primary-600 hover:text-primary-800 hover:underline"
+                    >
+                      {dish.kitchenName}
+                    </button>
+                  </dd>
+                </div>
+              )}
+              {dish.story && (
+                <div>
+                  <dt className="text-sm font-medium text-neutral-500">Story</dt>
+                  <dd className="mt-1 text-neutral-900 whitespace-pre-line">{dish.story}</dd>
+                </div>
+              )}
+              {dish.description && (
+                <div>
+                  <dt className="text-sm font-medium text-neutral-500">Description</dt>
+                  <dd className="mt-1 text-neutral-900 whitespace-pre-line">{dish.description}</dd>
+                </div>
+              )}
+            </dl>
           </div>
-          <div className="grid grid-cols-1 gap-2">
-            {dish.category && (
+          {/* Right column */}
+          <div>
+            <dl className="space-y-4">
+              
+              {dish.category && (
+                <div>
+                  <dt className="text-sm font-medium text-neutral-500">Category</dt>
+                  <dd className="mt-1">
+                    <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800 capitalize">
+                      {dish.category.replace('-', ' ')}
+                    </span>
+                  </dd>
+                </div>
+              )}
               <div>
-                <span className="text-sm font-medium text-neutral-500">Category</span>
-                <p className="mt-1 text-neutral-900 capitalize">{dish.category.replace('-', ' ')}</p>
+                <dt className="text-sm font-medium text-neutral-500">Allow Customization</dt>
+                <dd className="mt-1 text-neutral-900">{dish.allowCustomization ? 'Yes' : 'No'}</dd>
               </div>
-            )}
-            <div>
-              <span className="text-sm font-medium text-neutral-500">Allow Customization</span>
-              <p className="mt-1 text-neutral-900">{dish.allowCustomization ? 'Yes' : 'No'}</p>
-            </div>
-            <div>
-              <span className="text-sm font-medium text-neutral-500">Allow Negotiation</span>
-              <p className="mt-1 text-neutral-900">{dish.allowNegotiation ? 'Yes' : 'No'}</p>
-            </div>
-            <div>
-              <span className="text-sm font-medium text-neutral-500">Sold Out</span>
-              <p className="mt-1 text-neutral-900">{dish.isSoldOut ? 'Yes' : 'No'}</p>
-            </div>
+              <div>
+                <dt className="text-sm font-medium text-neutral-500">Allow Negotiation</dt>
+                <dd className="mt-1 text-neutral-900">{dish.allowNegotiation ? 'Yes' : 'No'}</dd>
+              </div>
+              <div>
+                <dt className="text-sm font-medium text-neutral-500">Sold Out</dt>
+                <dd className="mt-1 text-neutral-900">{dish.isSoldOut ? 'Yes' : 'No'}</dd>
+              </div>
+            </dl>
           </div>
         </div>
 
