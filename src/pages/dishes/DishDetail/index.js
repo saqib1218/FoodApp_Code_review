@@ -298,13 +298,7 @@ const DishDetail = () => {
                   <dd className="mt-1 text-neutral-900 whitespace-pre-line">{dish.description}</dd>
                 </div>
               )}
-            </dl>
-          </div>
-          {/* Right column */}
-          <div>
-            <dl className="space-y-4">
-              
-              {dish.category && (
+               {dish.category && (
                 <div>
                   <dt className="text-sm font-medium text-neutral-500">Category</dt>
                   <dd className="mt-1">
@@ -314,6 +308,13 @@ const DishDetail = () => {
                   </dd>
                 </div>
               )}
+            </dl>
+          </div>
+          {/* Right column */}
+          <div>
+            <dl className="space-y-4">
+              
+             
               <div>
                 <dt className="text-sm font-medium text-neutral-500">Allow Customization</dt>
                 <dd className="mt-1 text-neutral-900">{dish.allowCustomization ? 'Yes' : 'No'}</dd>
