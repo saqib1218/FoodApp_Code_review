@@ -1,77 +1,85 @@
-import React, { useState, useEffect } from 'react';
+import React from 'react';
+import { useState, useEffect } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
-import { PaperAirplaneIcon, UserCircleIcon } from '@heroicons/react/24/outline';
+import { PaperAirplaneIcon, UserCircleIcon, EllipsisVerticalIcon } from '@heroicons/react/24/outline';
+import myChatData from '../../data/chat/myEngagement.json';
 
-const EngagementCenter = () => {
+const MyEngagements = () => {
   const location = useLocation();
   const navigate = useNavigate();
   const [conversations, setConversations] = useState([]);
   const [selectedConversation, setSelectedConversation] = useState(null);
   const [message, setMessage] = useState('');
   const [isLoading, setIsLoading] = useState(true);
-  
+  const [menuOpenFor, setMenuOpenFor] = useState(null);
+
   // Get partner data from navigation state
   const partnerData = location.state || {};
   const { partnerId, partnerName, partnerEmail, partnerPhone, openChat } = partnerData;
-  
+
   // Debug: Log the received data
-  console.log('EngagementCenter - Received navigation data:', partnerData);
+  console.log('MyEngagements - Received navigation data:', partnerData);
   console.log('Partner details:', { partnerId, partnerName, partnerEmail, partnerPhone, openChat });
 
-  // Load conversations - handle partner data from navigation
+  // Load conversations from JSON and optionally append partner chat
   useEffect(() => {
-    console.log('EngagementCenter useEffect - Checking partner data:', { partnerId, partnerName, openChat });
-    
-    // If coming from kitchen partners tab with specific partner data
+    let data = Array.isArray(myChatData) ? [...myChatData] : [];
+
+    // If navigation provided a specific partner to open, prepend it
     if (partnerId && partnerName && openChat) {
-      console.log('Creating partner conversation for:', partnerName);
+      const nowIso = new Date().toISOString();
       const partnerConversation = {
         id: partnerId,
-        customer: {
+        user: {
           id: partnerId,
           name: partnerName,
           email: partnerEmail,
           phone: partnerPhone,
-          avatar: null
+          avatar: null,
+          online: true,
+          lastSeen: null
         },
+        pinned: false,
         lastMessage: {
           text: 'Start a conversation with this partner',
-          timestamp: new Date().toISOString(),
-          isCustomer: false
+          timestamp: nowIso,
+          isCustomer: false,
+          status: 'sent'
         },
         unread: 0,
-        isPartner: true // Flag to identify partner conversations
+        messages: [
+          {
+            id: 1,
+            text: `Chat started with ${partnerName}`,
+            timestamp: nowIso.replace('T', ' ').substring(0, 16),
+            isCustomer: false,
+            isSystem: true,
+            status: 'sent'
+          }
+        ]
       };
-      
-      // Set this as the only conversation and auto-select it with messages
-      setConversations([partnerConversation]);
-      
-      // Initialize messages for the partner conversation
-      const initialMessages = [
-        {
-          id: 1,
-          text: `Chat started with ${partnerName}`,
-          timestamp: new Date().toISOString().replace('T', ' ').substring(0, 16),
-          isCustomer: false,
-          isSystem: true
-        }
-      ];
-      
-      const selectedConv = {
-        ...partnerConversation,
-        messages: initialMessages
-      };
-      
-      console.log('Setting selected conversation:', selectedConv);
-      setSelectedConversation(selectedConv);
-    } else {
-      // Load conversations from API or keep empty if no data
-      // TODO: Replace with actual API call to fetch conversations
-      setConversations([]);
+      // Avoid duplicate if already exists
+      const exists = data.some(c => c.id === partnerId);
+      if (!exists) data.unshift(partnerConversation);
+      setSelectedConversation(partnerConversation);
     }
-    
+
+    // Sort pinned first, then by lastMessage timestamp desc
+    const sorted = data.sort((a, b) => {
+      if (a.pinned && !b.pinned) return -1;
+      if (!a.pinned && b.pinned) return 1;
+      const at = new Date(a.lastMessage?.timestamp || 0).getTime();
+      const bt = new Date(b.lastMessage?.timestamp || 0).getTime();
+      return bt - at;
+    });
+
+    setConversations(sorted);
+    // Auto-select the top chat by default if nothing is selected already
+    if (!selectedConversation && sorted.length > 0) {
+      setSelectedConversation(sorted[0]);
+    }
     setIsLoading(false);
-  }, [partnerId, partnerName, partnerEmail, partnerPhone, openChat]);
+  }, [partnerId, partnerName, partnerEmail, partnerPhone, openChat, selectedConversation]);
 
   // Fetch messages for a conversation
   const fetchMessages = (conversationId) => {
@@ -98,7 +106,7 @@ const EngagementCenter = () => {
       c.id === conversation.id ? { ...c, unread: 0 } : c
     );
     setConversations(updatedConversations);
-    
+
     // Fetch messages for the selected conversation
     const messages = fetchMessages(conversation.id);
     setSelectedConversation({
@@ -109,7 +117,7 @@ const EngagementCenter = () => {
 
   const handleSendMessage = (e) => {
     e.preventDefault();
-    
+
     if (!message.trim() || !selectedConversation) return;
 
     // Add the new message to the conversation
@@ -139,6 +147,30 @@ const EngagementCenter = () => {
 
     // Clear the message input
     setMessage('');
+  };
+
+  // Helpers for header/subtitle and chat actions
+  const formatLastSeen = (user) => {
+    if (user?.online) return 'online';
+    if (!user?.lastSeen) return '';
+    try {
+      const d = new Date(user.lastSeen);
+      return `last seen ${d.toLocaleDateString()} ${d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`;
+    } catch {
+      return '';
+    }
+  };
+
+  const toggleMenu = (id) => {
+    setMenuOpenFor(prev => (prev === id ? null : id));
+  };
+
+  const pinChat = (id) => {
+    const updated = conversations.map(c => c.id === id ? { ...c, pinned: true } : c);
+    // sort: pinned first, keep relative order otherwise
+    const sorted = updated.sort((a, b) => (a.pinned === b.pinned ? 0 : a.pinned ? -1 : 1));
+    setConversations(sorted);
+    setMenuOpenFor(null);
   };
 
   return (
@@ -178,18 +210,29 @@ const EngagementCenter = () => {
                       <div className="px-4 py-4 sm:px-6">
                         <div className="flex items-center justify-between">
                           <div className="flex items-center">
-                            <div className="flex-shrink-0">
-                              <UserCircleIcon className="h-10 w-10 text-gray-400" />
+                            <div className="relative flex-shrink-0">
+                              {conversation.user?.avatar ? (
+                                <img src={conversation.user.avatar} alt={conversation.user.name} className="h-10 w-10 rounded-full object-cover" />
+                              ) : (
+                                <UserCircleIcon className="h-10 w-10 text-gray-400" />
+                              )}
+                              {conversation.user?.online && (
+                                <span className="absolute bottom-0 right-0 block h-3 w-3 rounded-full ring-2 ring-white bg-green-500"></span>
+                              )}
                             </div>
                             <div className="ml-4">
-                              <div className="text-sm font-medium text-gray-900">
-                                {conversation.customer.name}
+                              <div className="text-sm font-medium text-gray-900 flex items-center gap-2">
+                                {conversation.user?.name}
+                                {conversation.pinned && (
+                                  <span className="text-xs text-primary-600 border border-primary-200 rounded px-1">Pinned</span>
+                                )}
                               </div>
-                              <div className="text-sm text-gray-500">
-                                {conversation.lastMessage.timestamp}
+                              <div className="text-xs text-gray-500">
+                                {formatLastSeen(conversation.user)}
                               </div>
                             </div>
                           </div>
+                          <div className="flex items-center gap-3">
                           {conversation.unread > 0 && (
                             <div className="flex-shrink-0">
                               <span className="inline-flex items-center justify-center h-6 w-6 rounded-full bg-primary-100 text-primary-800 text-xs font-medium">
@@ -197,6 +240,26 @@ const EngagementCenter = () => {
                               </span>
                             </div>
                           )}
+                            <button
+                              className="p-1 rounded hover:bg-gray-100"
+                              onClick={(e) => { e.stopPropagation(); toggleMenu(conversation.id); }}
+                              aria-label="More"
+                            >
+                              <EllipsisVerticalIcon className="h-5 w-5 text-gray-400" />
+                            </button>
+                            {menuOpenFor === conversation.id && (
+                              <div className="relative">
+                                <div className="absolute right-0 mt-2 w-36 bg-white border border-gray-200 rounded shadow z-10">
+                                  <button
+                                    className="block w-full text-left px-3 py-2 text-sm hover:bg-gray-50"
+                                    onClick={(e) => { e.stopPropagation(); pinChat(conversation.id); }}
+                                  >
+                                    Pin chat
+                                  </button>
+                                </div>
+                              </div>
+                            )}
+                          </div>
                         </div>
                         <div className="mt-2">
                           <p className="text-sm text-gray-600 truncate">
@@ -227,11 +290,11 @@ const EngagementCenter = () => {
                       <UserCircleIcon className="h-10 w-10 text-gray-400" />
                     </div>
                     <div className="ml-3">
-                      <div className="text-lg font-medium text-gray-900">
-                        {selectedConversation.customer.name}
+                      <div className="text-lg font-medium text-gray-900 flex items-center gap-2">
+                        {selectedConversation.user?.name || selectedConversation.customer?.name}
                       </div>
                       <div className="text-sm text-gray-500">
-                        Customer ID: {selectedConversation.customer.id}
+                        {formatLastSeen(selectedConversation.user)}
                       </div>
                     </div>
                   </div>
@@ -252,7 +315,14 @@ const EngagementCenter = () => {
                         }`}
                       >
                         <p className="text-sm">{msg.text}</p>
-                        <p className="text-xs text-gray-500 mt-1">{msg.timestamp}</p>
+                        <p className="text-xs text-gray-500 mt-1 flex items-center gap-1">
+                          {msg.timestamp}
+                          {!msg.isCustomer && (
+                            <span className="ml-1 text-primary-600">
+                              {msg.status === 'delivered' ? '✓✓' : '✓'}
+                            </span>
+                          )}
+                        </p>
                       </div>
                     </div>
                   ))}
@@ -296,4 +366,4 @@ const EngagementCenter = () => {
   );
 };
 
-export default EngagementCenter;
+export default MyEngagements;

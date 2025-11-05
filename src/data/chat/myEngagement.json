@@ -1,0 +1,111 @@
+[
+  {
+    "id": "u101",
+    "user": {
+      "id": "u101",
+      "name": "Ali Khan",
+      "avatar": "/images/avatars/ali.jpg",
+      "online": true,
+      "lastSeen": null
+    },
+    "pinned": true,
+    "lastMessage": {
+      "text": "Thanks for the update!",
+      "timestamp": "2025-11-05T12:45:00Z",
+      "isCustomer": true,
+      "status": "delivered"
+    },
+    "unread": 2,
+    "messages": [
+      {
+        "id": 1,
+        "text": "Hello Ali, how can I help you?",
+        "timestamp": "2025-11-05T12:40:00Z",
+        "isCustomer": false,
+        "status": "sent"
+      },
+      {
+        "id": 2,
+        "text": "I want to know my order status.",
+        "timestamp": "2025-11-05T12:42:00Z",
+        "isCustomer": true,
+        "status": "delivered"
+      },
+      {
+        "id": 3,
+        "text": "Thanks for the update!",
+        "timestamp": "2025-11-05T12:45:00Z",
+        "isCustomer": true,
+        "status": "delivered"
+      }
+    ]
+  },
+  {
+    "id": "u102",
+    "user": {
+      "id": "u102",
+      "name": "Sara Ahmed",
+      "avatar": "/images/avatars/sara.jpg",
+      "online": false,
+      "lastSeen": "2025-11-05T09:10:00Z"
+    },
+    "pinned": false,
+    "lastMessage": {
+      "text": "Will check and let you know.",
+      "timestamp": "2025-11-05T09:12:00Z",
+      "isCustomer": false,
+      "status": "sent"
+    },
+    "unread": 0,
+    "messages": [
+      {
+        "id": 1,
+        "text": "My payment failed, please assist.",
+        "timestamp": "2025-11-05T09:05:00Z",
+        "isCustomer": true,
+        "status": "delivered"
+      },
+      {
+        "id": 2,
+        "text": "Will check and let you know.",
+        "timestamp": "2025-11-05T09:12:00Z",
+        "isCustomer": false,
+        "status": "sent"
+      }
+    ]
+  },
+  {
+    "id": "u103",
+    "user": {
+      "id": "u103",
+      "name": "Omar Siddiqui",
+      "avatar": "/images/avatars/omar.jpg",
+      "online": false,
+      "lastSeen": "2025-11-04T18:25:00Z"
+    },
+    "pinned": false,
+    "lastMessage": {
+      "text": "Ok noted.",
+      "timestamp": "2025-11-04T18:30:00Z",
+      "isCustomer": true,
+      "status": "delivered"
+    },
+    "unread": 0,
+    "messages": [
+      {
+        "id": 1,
+        "text": "Delivery address updated.",
+        "timestamp": "2025-11-04T18:20:00Z",
+        "isCustomer": false,
+        "status": "delivered"
+      },
+      {
+        "id": 2,
+        "text": "Ok noted.",
+        "timestamp": "2025-11-04T18:30:00Z",
+        "isCustomer": true,
+        "status": "delivered"
+      }
+    ]
+  }
+]

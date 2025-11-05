@@ -17,7 +17,8 @@ import KitchenDetail from './pages/kitchens/KitchenDetail';
 import OnboardingQueue from './pages/kitchens/OnboardingQueue';
 import OrdersList from './pages/orders/OrdersList';
 import OrderDetail from './pages/orders/OrderDetail';
-import EngagementCenter from './pages/engagement/EngagementCenter';
+import MyEngagements from './pages/engagement/MyEngagements';
+import TeamEngagements from './pages/engagement/TeamEngagements';
 import CustomersList from './pages/customers/CustomersList';
 import CustomerDetail from './pages/customers/CustomerDetail';
 import PartenerList from './pages/partener/PartenerList';
@@ -137,9 +138,16 @@ function App() {
               </ProtectedRoute>
             } />
             
-            <Route path="/engagement" element={
+            {/* Engagement: mirror Cases structure with two tabs */}
+            <Route path="/engagement" element={<Navigate to="/engagement/my" replace />} />
+            <Route path="/engagement/my" element={
               <ProtectedRoute routeName="engagement">
-                <EngagementCenter />
+                <MyEngagements />
+              </ProtectedRoute>
+            } />
+            <Route path="/engagement/team" element={
+              <ProtectedRoute routeName="engagement">
+                <TeamEngagements />
               </ProtectedRoute>
             } />
             

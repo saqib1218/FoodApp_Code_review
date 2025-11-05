@@ -29,6 +29,7 @@ const MainLayout = () => {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [showActionButtons, setShowActionButtons] = useState(false);
   const [casesOpen, setCasesOpen] = useState(false);
+  const [engagementsOpen, setEngagementsOpen] = useState(false);
   const { currentUser, logout } = useAuth();
   const { hasPermission, isPermissionsLoaded } = usePermissions();
   const navigate = useNavigate();
@@ -52,8 +53,9 @@ const MainLayout = () => {
       location.pathname.startsWith(screen));
     
     setShowActionButtons(isModeration);
-    // Auto-open Case Management submenu when on /cases routes
+    // Auto-open submenus when on their routes
     setCasesOpen(location.pathname.startsWith('/cases'));
+    setEngagementsOpen(location.pathname.startsWith('/engagement'));
   }, [location]);
 
   // Define navigation items with required permissions (using database permission keys)
@@ -160,6 +162,41 @@ const MainLayout = () => {
                       </div>
                     )}
                   </div>
+                ) : item.href === '/engagement' ? (
+                  <div key={item.name} className="space-y-1">
+                    <button
+                      type="button"
+                      onClick={() => setEngagementsOpen((v) => !v)}
+                      className={`${(engagementsOpen || location.pathname.startsWith('/engagement')) ? 'bg-primary-700 text-white' : 'text-white hover:bg-primary-500'} group flex w-full items-center px-2 py-2 text-base font-medium rounded-md`}
+                    >
+                      <item.icon className="mr-4 flex-shrink-0 h-6 w-6 text-primary-200" aria-hidden="true" />
+                      Engagement
+                    </button>
+                    {engagementsOpen && (
+                      <div className="ml-10 space-y-1">
+                        <NavLink
+                          to="/engagement/my"
+                          className={({ isActive }) =>
+                            isActive
+                              ? 'bg-primary-700 text-white group flex items-center px-2 py-2 text-base font-medium rounded-md'
+                              : 'text-white/90 hover:bg-primary-500 group flex items-center px-2 py-2 text-base font-medium rounded-md'
+                          }
+                        >
+                          My Engagements
+                        </NavLink>
+                        <NavLink
+                          to="/engagement/team"
+                          className={({ isActive }) =>
+                            isActive
+                              ? 'bg-primary-700 text-white group flex items-center px-2 py-2 text-base font-medium rounded-md'
+                              : 'text-white/90 hover:bg-primary-500 group flex items-center px-2 py-2 text-base font-medium rounded-md'
+                          }
+                        >
+                          Team Engagements
+                        </NavLink>
+                      </div>
+                    )}
+                  </div>
                 ) : (
                   <NavLink
                     key={item.name}
@@ -224,6 +261,41 @@ const MainLayout = () => {
                             }
                           >
                             All Cases
+                          </NavLink>
+                        </div>
+                      )}
+                    </div>
+                  ) : item.href === '/engagement' ? (
+                    <div key={item.name} className="space-y-1">
+                      <button
+                        type="button"
+                        onClick={() => setEngagementsOpen((v) => !v)}
+                        className={`${(engagementsOpen || location.pathname.startsWith('/engagement')) ? 'bg-primary-700 text-white' : 'text-white hover:bg-primary-500'} group flex w-full items-center px-2 py-2 text-sm font-medium rounded-md`}
+                      >
+                        <item.icon className="mr-3 flex-shrink-0 h-6 w-6 text-neutral-200" aria-hidden="true" />
+                        Engagement
+                      </button>
+                      {engagementsOpen && (
+                        <div className="ml-10 space-y-1">
+                          <NavLink
+                            to="/engagement/my"
+                            className={({ isActive }) =>
+                              isActive
+                                ? 'bg-primary-700 text-white group flex items-center px-2 py-2 text-sm font-medium rounded-md'
+                                : 'text-white/90 hover:bg-primary-500 group flex items-center px-2 py-2 text-sm font-medium rounded-md'
+                            }
+                          >
+                            My Engagements
+                          </NavLink>
+                          <NavLink
+                            to="/engagement/team"
+                            className={({ isActive }) =>
+                              isActive
+                                ? 'bg-primary-700 text-white group flex items-center px-2 py-2 text-sm font-medium rounded-md'
+                                : 'text-white/90 hover:bg-primary-500 group flex items-center px-2 py-2 text-sm font-medium rounded-md'
+                            }
+                          >
+                            Team Engagements
                           </NavLink>
                         </div>
                       )}

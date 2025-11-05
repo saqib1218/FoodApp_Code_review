@@ -1,0 +1,56 @@
+[
+  {
+    "id": "t201",
+    "user": {
+      "id": "t201",
+      "name": "Support Queue - North",
+      "avatar": "/images/avatars/team-north.jpg",
+      "online": true,
+      "lastSeen": null
+    },
+    "pinned": false,
+    "lastMessage": {
+      "text": "New ticket from order #7843",
+      "timestamp": "2025-11-05T13:20:00Z",
+      "isCustomer": true,
+      "status": "delivered"
+    },
+    "unread": 5,
+    "messages": [
+      {
+        "id": 1,
+        "text": "New ticket from order #7843",
+        "timestamp": "2025-11-05T13:20:00Z",
+        "isCustomer": true,
+        "status": "delivered"
+      }
+    ]
+  },
+  {
+    "id": "t202",
+    "user": {
+      "id": "t202",
+      "name": "Support Queue - South",
+      "avatar": "/images/avatars/team-south.jpg",
+      "online": false,
+      "lastSeen": "2025-11-05T10:00:00Z"
+    },
+    "pinned": false,
+    "lastMessage": {
+      "text": "Backlog reduced to 2",
+      "timestamp": "2025-11-05T10:15:00Z",
+      "isCustomer": false,
+      "status": "sent"
+    },
+    "unread": 0,
+    "messages": [
+      {
+        "id": 1,
+        "text": "Backlog reduced to 2",
+        "timestamp": "2025-11-05T10:15:00Z",
+        "isCustomer": false,
+        "status": "sent"
+      }
+    ]
+  }
+]
