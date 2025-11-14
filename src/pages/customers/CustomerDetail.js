@@ -280,9 +280,7 @@ const CustomerDetail = () => {
 
   if (isLoading) {
     return (
-      <div className="flex items-center justify-center h-64">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary-500"></div>
-      </div>
+      <div className="p-6 text-center text-neutral-600">Working on it...</div>
     );
   }
 
@@ -308,136 +306,12 @@ const CustomerDetail = () => {
           </span>
         );
       default:
-        return null;
-    }
-  };
 
   return (
-    <div>
-      {/* Header with back button */}
-      <div className="mb-6">
-        <div className="flex items-center">
-          <button
-            type="button"
-            onClick={() => {
-              const from = location.state?.from;
-              if (from && from.pathname) {
-                navigate(from.pathname + (from.search || ''), { replace: true });
-              } else if (window.history.length > 1) {
-                navigate(-1);
-              } else {
-                navigate('/customers');
-              }
-            }}
-            className="mr-4 p-2 rounded-full hover:bg-gray-100"
-            aria-label="Go back"
-          >
-            <ArrowLeftIcon className="h-5 w-5 text-gray-500" />
-          </button>
-          <div>
-            <h1 className="text-2xl font-semibold text-gray-900">{customer.name}</h1>
-            <p className="text-sm text-gray-500">
-              Customer ID: {customer.id} • {getStatusBadge(customer.status)}
-            </p>
-          </div>
-        </div>
-      </div>
-
-      {/* Tabs */}
-      <div className="border-b border-gray-200 mb-6">
-        <nav className="-mb-px flex space-x-8">
-          <button
-            onClick={() => setActiveTab('info')}
-            className={`${
-              activeTab === 'info'
-                ? 'border-primary-500 text-primary-600'
-                : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
-            } whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm`}
-          >
-            Customer Info
-          </button>
-          <button
-            onClick={() => setActiveTab('orders')}
-            className={`${
-              activeTab === 'orders'
-                ? 'border-primary-500 text-primary-600'
-                : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
-            } whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm`}
-          >
-            Orders
-          </button>
-          <button
-            onClick={() => setActiveTab('engagement')}
-            className={`${
-              activeTab === 'engagement'
-                ? 'border-primary-500 text-primary-600'
-                : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
-            } whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm`}
-          >
-            Engagement
-          </button>
-          <button
-            onClick={() => setActiveTab('tags')}
-            className={`${
-              activeTab === 'tags'
-                ? 'border-primary-500 text-primary-600'
-                : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
-            } whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm`}
-          >
-            Segmentation & Tags
-          </button>
-          <button
-            onClick={() => setActiveTab('preferences')}
-            className={`${
-              activeTab === 'preferences'
-                ? 'border-primary-500 text-primary-600'
-                : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
-            } whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm`}
-          >
-            Preferences
-          </button>
-          <button
-            onClick={() => setActiveTab('notes')}
-            className={`${
-              activeTab === 'notes'
-                ? 'border-primary-500 text-primary-600'
-                : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
-            } whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm`}
-          >
-            Notes
-          </button>
-          <button
-            onClick={() => setActiveTab('actions')}
-            className={`${
-              activeTab === 'actions'
-                ? 'border-primary-500 text-primary-600'
-                : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
-            } whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm`}
-          >
-            Quick Actions
-          </button>
-          <button
-            onClick={() => setActiveTab('discounts')}
-            className={`${
-              activeTab === 'discounts'
-                ? 'border-primary-500 text-primary-600'
-                : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
-            } whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm`}
-          >
-            Discounts
-          </button>
-          <button
-            onClick={() => setActiveTab('loyalty')}
-            className={`${
-              activeTab === 'loyalty'
-                ? 'border-primary-500 text-primary-600'
-                : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
-            } whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm`}
-          >
-            Loyalty Points
-          </button>
-        </nav>
-      </div>
+    <div className="p-6 text-center text-neutral-600">Working on it...</div>
+  );
+};
+  
 
       {/* Tab Content */}
       <div className="bg-white shadow rounded-lg">
@@ -1688,8 +1562,8 @@ const CustomerDetail = () => {
           variant={confirmationAction.includes('delete') ? 'danger' : 'primary'}
         />
       )}
-    </div>
-  );
+    
+}
 
   // Helper functions for confirmation modal
   function getConfirmationTitle() {
@@ -1831,6 +1705,5 @@ const CustomerDetail = () => {
     setPendingAction(null);
     setConfirmationComment('');
   }
-};
-
+}
 export default CustomerDetail;
